@@ -192,18 +192,24 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
     }
 
     case 'stat_grid': {
-      const stats: Stat[] = slide.stats.map((s) => {
-        let val = s.value;
-        if (s.factKey && campaign) {
-          const resolved = resolveFactValue(s.factKey, campaign);
-          if (resolved) val = resolved;
-        }
-        return {
-          label: s.label,
-          value: val,
-          caption: s.caption,
-        };
-      });
+      const stats: Stat[] = slide.stats
+        .map((s): Stat | null => {
+          let val = s.value;
+          if (s.factKey && campaign) {
+            const resolved = resolveFactValue(s.factKey, campaign);
+            if (resolved) {
+              val = resolved;
+            } else {
+              return null;
+            }
+          }
+          return {
+            label: s.label,
+            value: val,
+            caption: s.caption,
+          };
+        })
+        .filter((s): s is Stat => s !== null);
 
       return (
         <StatGrid
@@ -236,14 +242,20 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
     }
 
     case 'financial_snapshot': {
-      const metrics = slide.metrics.map((m) => {
-        let val = m.value;
-        if (m.factKey && campaign) {
-          const resolved = resolveFactValue(m.factKey, campaign);
-          if (resolved) val = resolved;
-        }
-        return { ...m, value: val };
-      });
+      const metrics = slide.metrics
+        .map((m) => {
+          let val = m.value;
+          if (m.factKey && campaign) {
+            const resolved = resolveFactValue(m.factKey, campaign);
+            if (resolved) {
+              val = resolved;
+            } else {
+              return null;
+            }
+          }
+          return { ...m, value: val };
+        })
+        .filter((m): m is NonNullable<typeof m> => m !== null);
 
       return (
         <Slide center nav={slide.navLabel || 'Financials'} notes={slide.speakerNotes}>

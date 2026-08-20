@@ -323,7 +323,18 @@ export class SupabaseFunctionsProvider implements IAIProvider {
       throw new BackendGenerationError('The secure AI backend returned a malformed presentation deck.', 'malformed_structured_response');
     }
 
+    const deck = parsed.data as PresentationDeck;
+    if (!deck.generationMetadata) {
+      deck.generationMetadata = data.metadata || {
+        requestedModel: targetModel,
+        actualModel: data.model || targetModel,
+        fallbackOccurred: false,
+        latencyMs: 0,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
     onProgress?.('Presentation deck ready.', 100);
-    return parsed.data as PresentationDeck;
+    return deck;
   }
 }
