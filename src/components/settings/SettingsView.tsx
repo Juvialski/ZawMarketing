@@ -108,7 +108,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ organizationId }) =>
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-12">
+    <div className="space-y-8 max-w-[1500px] mx-auto pb-12">
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-subtle flex flex-wrap items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-bold">

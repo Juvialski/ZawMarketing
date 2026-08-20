@@ -43,7 +43,7 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
     setFallbackNotice(null);
 
     try {
-      const provider = ProviderManager.getAIProvider();
+      const provider = ProviderManager.getAIProvider(runtimeMode);
       const generated = await provider.generateStrategy(
         campaign.sourceData,
         brandKit,
@@ -59,8 +59,10 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
 
       setStrategy(generated);
       onSaveStrategy(generated);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to generate strategy', err);
+      const message = err instanceof Error ? err.message : 'AI strategy generation failed. Please try again.';
+      alert(message);
     } finally {
       setIsGenerating(false);
       setProgressMsg('');
@@ -70,25 +72,33 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
   if (!strategy) {
     return (
       <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center max-w-2xl mx-auto space-y-5">
-        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto text-amber-700">
+        <div className="w-12 h-12 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-center mx-auto text-amber-700">
           <Compass className="w-6 h-6" />
         </div>
         <div>
-          <h3 className="text-lg font-serif font-bold text-slate-900">
-            No Campaign Strategy Generated Yet
-          </h3>
+          <h2 className="text-lg font-serif font-bold text-slate-900">
+            Generate Property Marketing Strategy
+          </h2>
           <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-            Synthesize market positioning, target audience pain points, primary value proposition, and quantifiable hooks before writing copy.
+            Synthesize financial underwriting metrics, target audience profiles, core hooks, and a multi-channel distribution plan.
           </p>
         </div>
-
         <button
           onClick={handleGenerateStrategy}
           disabled={isGenerating}
-          className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm inline-flex items-center gap-2"
+          className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm inline-flex items-center gap-2 transition-all disabled:opacity-50"
         >
-          {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin text-amber-400" /> : <SparklesIcon className="w-4 h-4 text-amber-400" />}
-          <span>{isGenerating ? progressMsg || 'Synthesizing...' : 'Generate Campaign Strategy'}</span>
+          {isGenerating ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+              <span>{progressMsg || 'Synthesizing Strategy...'}</span>
+            </>
+          ) : (
+            <>
+              <Lightbulb className="w-4 h-4 text-amber-400" />
+              <span>Generate AI Strategy Dossier</span>
+            </>
+          )}
         </button>
       </div>
     );
@@ -97,7 +107,7 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
   const metadata = strategy.generationMetadata;
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-8 max-w-[1500px] mx-auto">
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-subtle flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -257,11 +267,3 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
     </div>
   );
 };
-
-function SparklesIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg fill="currentColor" viewBox="0 0 24 24" {...props}>
-      <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-    </svg>
-  );
-}

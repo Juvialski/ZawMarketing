@@ -12,8 +12,8 @@ export class ProviderManager {
    * 1. Supabase Edge Functions (when backend is live)
    * 2. Explicit high-fidelity demo fixture when no backend is configured
   */
-  public static getAIProvider(): IAIProvider {
-    if (isSupabaseConfigured()) {
+  public static getAIProvider(runtimeMode: 'demo' | 'live' = 'live'): IAIProvider {
+    if (runtimeMode !== 'demo' && isSupabaseConfigured()) {
       return new SupabaseFunctionsProvider();
     }
 

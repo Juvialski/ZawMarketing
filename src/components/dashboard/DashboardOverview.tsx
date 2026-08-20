@@ -6,7 +6,8 @@ import {
   ArrowRight, 
   Plus, 
   Search,
-  ShieldCheck
+  ShieldCheck,
+  Presentation
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -29,8 +30,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const totalVolume = campaigns.reduce((sum, c) => sum + (c.sourceData.property?.financials.purchasePrice || 0), 0);
   const totalSpread = campaigns.reduce((sum, c) => sum + (c.sourceData.property?.financials.equitySpread || 0), 0);
 
+  const phoenixCampaign = campaigns.find(
+    (c) => c.id === 'campaign-phoenix-fix-flip' || c.tags?.includes('Demo') || c.tags?.includes('Phoenix')
+  );
+
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-8 max-w-[1500px] mx-auto">
       {/* 1. Hero Welcome Banner */}
       <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-elevated relative overflow-hidden">
         <div className="relative z-10 max-w-2xl space-y-3">
@@ -68,6 +73,40 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         {/* Decorative Grid Pattern */}
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-amber-500/10 to-transparent pointer-events-none" />
       </div>
+
+      {/* Flagship Demo Showcase Card */}
+      {phoenixCampaign && (
+        <div
+          onClick={() => onSelectCampaign(phoenixCampaign)}
+          className="p-6 bg-gradient-to-r from-amber-50 via-amber-50/60 to-white rounded-3xl border border-amber-200 hover:border-amber-300 shadow-subtle hover:shadow-elevated transition-all flex flex-wrap items-center justify-between gap-4 cursor-pointer"
+        >
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded">
+                FLAGSHIP DEMO SHOWCASE
+              </span>
+              <span className="text-[11px] text-amber-800 font-mono font-semibold">12-Slide Investment Deck · Preflight Passed</span>
+            </div>
+            <h2 className="text-base font-serif font-bold text-slate-900">
+              {phoenixCampaign.name}
+            </h2>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Explore a complete value-add flip package with deterministic pro-forma financials, 300 DPI flyers, anti-slop copy, and full presentation deck.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectCampaign(phoenixCampaign);
+            }}
+            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+          >
+            <Presentation className="w-4 h-4" />
+            <span>OPEN FLAGSHIP DEMO</span>
+          </button>
+        </div>
+      )}
 
       {/* 2. Key Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

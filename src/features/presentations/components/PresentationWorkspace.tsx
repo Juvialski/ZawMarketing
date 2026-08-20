@@ -88,7 +88,7 @@ export const PresentationWorkspace: React.FC<PresentationWorkspaceProps> = ({
         const demoDeck = generateDeterministicPresentationDeck(campaign, brandKit);
         handleSaveDeck(demoDeck);
       } else {
-        const ai = ProviderManager.getAIProvider();
+        const ai = ProviderManager.getAIProvider(runtimeMode);
         const newDeck = await ai.generatePresentationDeck(
           campaign,
           brandKit,

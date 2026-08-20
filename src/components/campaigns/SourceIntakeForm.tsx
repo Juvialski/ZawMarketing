@@ -155,13 +155,13 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-subtle max-w-4xl mx-auto">
+    <form onSubmit={handleSubmit} className="space-y-8 bg-white p-6 sm:p-8 lg:p-10 rounded-2xl border border-slate-200 shadow-subtle w-full max-w-[1500px] mx-auto">
       {/* Header */}
       <div className="border-b border-slate-200 pb-5">
-        <h2 className="text-xl font-serif font-bold text-slate-900">
+        <h2 className="text-xl sm:text-2xl font-serif font-bold text-slate-900">
           Campaign Intake & Property Underwriting
         </h2>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-slate-500 mt-1 max-w-3xl">
           Provide property details, underwriting metrics, and photos. Deterministic layout templates and the anti-slop copy engine will build your complete campaign package.
         </p>
       </div>
@@ -171,7 +171,7 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
         <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-800">
           1. Campaign Objective & Type
         </label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { id: 'fix_and_flip', label: 'Fix & Flip / Value-Add', desc: 'Short-term equity spread' },
             { id: 'cash_flow_rental', label: 'Cash Flow Rental / Multi', desc: 'Cap rate & long-term yield' },
@@ -182,7 +182,7 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
               key={type.id}
               type="button"
               onClick={() => setCampaignType(type.id as CampaignType)}
-              className={`p-3 rounded-xl border text-left transition-all ${
+              className={`p-3.5 rounded-xl border text-left transition-all ${
                 campaignType === type.id
                   ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
                   : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
@@ -196,8 +196,8 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
       </div>
 
       {/* 2. Core Location & Title */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="sm:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="md:col-span-2 lg:col-span-3">
           <label htmlFor="campaign-working-title" className="block text-xs font-semibold text-slate-700 mb-1">Campaign Working Title</label>
           <input
             id="campaign-working-title"
@@ -205,34 +205,37 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-slate-900"
+            className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-slate-900 bg-white"
             placeholder="e.g. Phoenix Value-Add 3-Bed ($285k Basis)"
           />
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Target Metro / Submarket</label>
+        <div className="md:col-span-1 lg:col-span-1">
+          <label htmlFor="target-metro-submarket" className="block text-xs font-semibold text-slate-700 mb-1">Target Metro / Submarket</label>
           <input
+            id="target-metro-submarket"
             type="text"
             required
             value={targetMarket}
             onChange={(e) => setTargetMarket(e.target.value)}
-            className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-slate-900"
+            className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:ring-1 focus:ring-slate-900 bg-white"
             placeholder="e.g. Phoenix, AZ (Arcadia Lite)"
           />
         </div>
       </div>
 
       {/* 3. Property Address & Specifications */}
-      <div className="p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+      <div className="p-5 sm:p-6 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
         <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
           <MapPin className="w-4 h-4 text-slate-600" />
           Property Specifications
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <div className="sm:col-span-2">
-            <label className="block text-xs text-slate-600 mb-1">Street Address</label>
+        {/* Row 1: Street Address | City | State | ZIP */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label htmlFor="property-street-address" className="block text-xs text-slate-600 mb-1">Street Address</label>
             <input
+              id="property-street-address"
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
@@ -241,38 +244,46 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-600 mb-1">City</label>
+            <label htmlFor="property-city" className="block text-xs text-slate-600 mb-1">City</label>
             <input
+              id="property-city"
               type="text"
               value={city}
               onChange={(e) => setCity(e.target.value)}
               className="w-full text-xs p-2 border border-slate-300 rounded-lg bg-white"
+              placeholder="e.g. Phoenix"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-600 mb-1">State / Zip</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                className="w-1/2 text-xs p-2 border border-slate-300 rounded-lg bg-white"
-              />
-              <input
-                type="text"
-                value={zipCode}
-                onChange={(e) => setZipCode(e.target.value)}
-                className="w-1/2 text-xs p-2 border border-slate-300 rounded-lg bg-white"
-                placeholder="85008"
-              />
-            </div>
+            <label htmlFor="property-state" className="block text-xs text-slate-600 mb-1">State</label>
+            <input
+              id="property-state"
+              type="text"
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              className="w-full text-xs p-2 border border-slate-300 rounded-lg bg-white"
+              placeholder="e.g. AZ"
+            />
+          </div>
+          <div>
+            <label htmlFor="property-zip" className="block text-xs text-slate-600 mb-1">ZIP Code</label>
+            <input
+              id="property-zip"
+              type="text"
+              value={zipCode}
+              onChange={(e) => setZipCode(e.target.value)}
+              className="w-full text-xs p-2 border border-slate-300 rounded-lg bg-white"
+              placeholder="85008"
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        {/* Row 2: Neighborhood | Bedrooms | Bathrooms | Square Feet */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Neighborhood</label>
+            <label htmlFor="property-neighborhood" className="block text-xs text-slate-600 mb-1">Neighborhood</label>
             <input
+              id="property-neighborhood"
               type="text"
               value={neighborhood}
               onChange={(e) => setNeighborhood(e.target.value)}
@@ -281,47 +292,55 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Bedrooms</label>
+            <label htmlFor="property-bedrooms" className="block text-xs text-slate-600 mb-1">Bedrooms</label>
             <input
+              id="property-bedrooms"
               type="number"
               value={bedrooms}
               onChange={(e) => setBedrooms(e.target.value ? parseInt(e.target.value, 10) : '')}
               className="w-full text-xs p-2 border border-slate-300 rounded-lg bg-white"
+              placeholder="3"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Bathrooms</label>
+            <label htmlFor="property-bathrooms" className="block text-xs text-slate-600 mb-1">Bathrooms</label>
             <input
+              id="property-bathrooms"
               type="number"
               step="0.5"
               value={bathrooms}
               onChange={(e) => setBathrooms(e.target.value ? parseFloat(e.target.value) : '')}
               className="w-full text-xs p-2 border border-slate-300 rounded-lg bg-white"
+              placeholder="2"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Square Feet</label>
+            <label htmlFor="property-square-feet" className="block text-xs text-slate-600 mb-1">Square Feet</label>
             <input
+              id="property-square-feet"
               type="number"
               value={squareFeet}
               onChange={(e) => setSquareFeet(e.target.value ? parseInt(e.target.value, 10) : '')}
               className="w-full text-xs p-2 border border-slate-300 rounded-lg bg-white"
+              placeholder="1840"
             />
           </div>
         </div>
       </div>
 
       {/* 4. Financial Underwriting Numbers */}
-      <div className="p-5 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-4">
+      <div className="p-5 sm:p-6 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-4">
         <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-amber-900 flex items-center gap-2">
           <DollarSign className="w-4 h-4 text-amber-700" />
           Financial Underwriting Metrics (USD)
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Large Desktop: 5 columns in a single responsive row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Purchase Price</label>
+            <label htmlFor="financial-purchase-price" className="block text-xs font-semibold text-slate-700 mb-1">Purchase Price</label>
             <input
+              id="financial-purchase-price"
               type="number"
               value={purchasePrice}
               onChange={(e) => setPurchasePrice(e.target.value ? parseInt(e.target.value, 10) : '')}
@@ -330,8 +349,9 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Renovation Budget</label>
+            <label htmlFor="financial-renovation-budget" className="block text-xs font-semibold text-slate-700 mb-1">Renovation Budget</label>
             <input
+              id="financial-renovation-budget"
               type="number"
               value={renovationEstimate}
               onChange={(e) => setRenovationEstimate(e.target.value ? parseInt(e.target.value, 10) : '')}
@@ -340,8 +360,9 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">After Repair Value (ARV)</label>
+            <label htmlFor="financial-arv" className="block text-xs font-semibold text-slate-700 mb-1">After Repair Value (ARV)</label>
             <input
+              id="financial-arv"
               type="number"
               value={arv}
               onChange={(e) => setArv(e.target.value ? parseInt(e.target.value, 10) : '')}
@@ -349,12 +370,10 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
               placeholder="390000"
             />
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Projected Monthly Rent (If Rental/Multi)</label>
+            <label htmlFor="financial-projected-rent" className="block text-xs text-slate-600 mb-1">Projected Monthly Rent</label>
             <input
+              id="financial-projected-rent"
               type="number"
               value={projectedRent}
               onChange={(e) => setProjectedRent(e.target.value ? parseInt(e.target.value, 10) : '')}
@@ -363,8 +382,9 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-600 mb-1">Projected Cap Rate % (Optional)</label>
+            <label htmlFor="financial-cap-rate" className="block text-xs text-slate-600 mb-1">Projected Cap Rate %</label>
             <input
+              id="financial-cap-rate"
               type="number"
               step="0.1"
               value={capRate}
@@ -377,31 +397,33 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
       </div>
 
       {/* 5. Investment Thesis & Scope */}
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Investment Thesis & Scope Notes</label>
+          <label htmlFor="investment-thesis" className="block text-xs font-semibold text-slate-700 mb-1">Investment Thesis & Scope Notes</label>
           <textarea
-            rows={2}
+            id="investment-thesis"
+            rows={3}
             value={investmentThesis}
             onChange={(e) => setInvestmentThesis(e.target.value)}
-            className="w-full text-xs p-2.5 border border-slate-300 rounded-lg"
+            className="w-full text-xs p-3 border border-slate-300 rounded-lg focus:ring-1 focus:ring-slate-900 bg-white"
             placeholder="Describe the opportunity, why you are buying, and scope..."
           />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Deal Highlights / Comp Notes (1 per line)</label>
+          <label htmlFor="deal-highlights" className="block text-xs font-semibold text-slate-700 mb-1">Deal Highlights / Comp Notes (1 per line)</label>
           <textarea
-            rows={2}
+            id="deal-highlights"
+            rows={3}
             value={dealHighlights}
             onChange={(e) => setDealHighlights(e.target.value)}
-            className="w-full text-xs p-2.5 border border-slate-300 rounded-lg font-mono text-[11px]"
+            className="w-full text-xs p-3 border border-slate-300 rounded-lg font-mono text-[11px] focus:ring-1 focus:ring-slate-900 bg-white"
             placeholder="Enter key deal highlights..."
           />
         </div>
       </div>
 
       {/* 6. Photography & Asset Upload (Supabase Storage Enabled) */}
-      <div className="p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+      <div className="p-5 sm:p-6 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-slate-600" />
@@ -446,8 +468,8 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
           )}
         </div>
 
-        {/* Image Grid Preview */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+        {/* Image Grid Preview - 6 columns on desktop */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4 pt-2">
           {uploadedImages.map((img) => (
             <div
               key={img.id}

@@ -9,7 +9,7 @@ const families = [
 ] as const;
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?demo=1');
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
   await page.getByText(/Demo · Phoenix Value-Add/i).first().click();

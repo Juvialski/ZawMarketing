@@ -21,7 +21,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       VITE_SUPABASE_URL: 'https://csolgywkgummefnwouny.supabase.co',
-      VITE_SUPABASE_ANON_KEY: '',
+      VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.mock-valid-anon-key-for-zaw-marketing',
     },
   },
   projects: [

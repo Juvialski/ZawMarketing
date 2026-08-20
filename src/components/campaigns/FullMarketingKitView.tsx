@@ -51,7 +51,7 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
     setFallbackNotice(null);
 
     try {
-      const ai = ProviderManager.getAIProvider();
+      const ai = ProviderManager.getAIProvider(runtimeMode);
 
       // Single-turn full kit generation to conserve quota
       const result = await ai.generateFullMarketingKit(
@@ -64,16 +64,13 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
         { organizationId, campaignId: campaign.id, runtimeMode }
       );
 
-      if (result.metadata.fallbackOccurred) {
+      if (result.metadata?.fallbackOccurred) {
         setFallbackNotice(
-          `Generated using ${result.metadata.actualModel} because ${result.metadata.requestedModel} reached its quota limit or was unavailable.`
+          `Generated via fallback model: ${result.metadata.actualModel} (${result.metadata.fallbackReason || 'quota limit'})`
         );
       }
 
-      setCurrentStepName('Phase 2: Building Deterministic Graphic Renderings...');
-      setProgressPercent(95);
-
-      const updatedCampaign: Campaign = {
+      const updated: Campaign = {
         ...campaign,
         status: 'completed',
         strategy: result.strategy,
@@ -81,12 +78,13 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
         generationMetadata: result.metadata,
       };
 
-      onUpdateCampaign(updatedCampaign);
+      onUpdateCampaign(updated);
       setProgressPercent(100);
       setCurrentStepName('Full Marketing Kit Package Ready!');
-    } catch (err) {
-      console.error('Failed to generate full marketing kit', err);
-      alert('Generation encountered an error. Please check your provider settings.');
+    } catch (err: unknown) {
+      console.error('Full kit generation failed', err);
+      const message = err instanceof Error ? err.message : 'Campaign kit generation failed. Please try again.';
+      alert(message);
     } finally {
       setIsGeneratingAll(false);
     }
@@ -148,7 +146,7 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
   const metadata = campaign.generationMetadata || campaign.copy?.generationMetadata;
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-8 max-w-[1500px] mx-auto">
       {/* 1. Header Banner */}
       <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-subtle flex flex-wrap items-center justify-between gap-6">
         <div className="max-w-xl">

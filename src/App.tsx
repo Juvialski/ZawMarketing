@@ -32,7 +32,12 @@ export function App() {
   const [hasPersistedBrandKit, setHasPersistedBrandKit] = useState(false);
   const [profile, setProfile] = useState<AppProfile | null>(null);
   const [organization, setOrganization] = useState<AppOrganization | null>(null);
-  const [runtimeMode, setRuntimeMode] = useState<'demo' | 'live'>(() => (isSupabaseConfigured() ? 'live' : 'demo'));
+  const [runtimeMode, setRuntimeMode] = useState<'demo' | 'live'>(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1') {
+      return 'demo';
+    }
+    return isSupabaseConfigured() ? 'live' : 'demo';
+  });
   const [dataError, setDataError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -45,24 +50,55 @@ export function App() {
     return { isPresenterMode: presenter, presenterCampaignId: campaignId };
   }, []);
 
+  const handleEnterDemo = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('demo', '1');
+    url.searchParams.delete('presenter');
+    url.searchParams.delete('campaign');
+    window.location.assign(url.toString());
+  };
+
+  const handleExitDemo = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('demo');
+    url.searchParams.delete('presenter');
+    url.searchParams.delete('campaign');
+    window.location.assign(url.pathname + (url.search ? url.search : ''));
+  };
+
   const loadData = async () => {
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const isExplicitDemo = params?.get('demo') === '1';
+
+    // Explicit demo mode is checked FIRST and isolated from live Supabase calls
+    if (isExplicitDemo) {
+      setRuntimeMode('demo');
+      setProfile(null);
+      setOrganization(null);
+      setCampaigns(CampaignStore.getAll({ allowDemoFixtures: true }));
+      setBrandKit(BrandKitStore.get({ allowDemoFixtures: true }));
+      setHasPersistedBrandKit(false);
+      setDataError(null);
+      return;
+    }
+
     const live = isSupabaseConfigured();
     setRuntimeMode(live ? 'live' : 'demo');
     setDataError(null);
 
     try {
-      const user = await AuthService.getUser();
-      if (!user && live) {
-        // Configured but unauthenticated is a real live state, not demo mode.
-        setProfile(null);
-        setOrganization(null);
-        setCampaigns([]);
-        setBrandKit(createNeutralBrandKit());
-        setHasPersistedBrandKit(false);
-        return;
-      }
+      if (live) {
+        const user = await AuthService.getUser();
+        if (!user) {
+          // Configured but unauthenticated is a real live state, not demo mode.
+          setProfile(null);
+          setOrganization(null);
+          setCampaigns([]);
+          setBrandKit(createNeutralBrandKit());
+          setHasPersistedBrandKit(false);
+          return;
+        }
 
-      if (user) {
         const userProfile = await AuthService.getProfile(user.id);
         const org = await OrganizationService.getDefaultOrganization(user.id);
         if (!org) {
@@ -126,13 +162,20 @@ export function App() {
 
   const handleUpdateCampaign = async (updated: Campaign) => {
     try {
-      const saved = runtimeMode === 'live'
-        ? organization
-          ? await CampaignService.updateCampaign(organization.id, updated, profile?.id)
-          : (() => { throw new ServiceError('forbidden', 'Sign in to update a live campaign.'); })()
-        : await CampaignService.updateCampaign('', updated, profile?.id);
+      if (runtimeMode === 'demo') {
+        const saved = CampaignStore.save(updated, { allowDemoFixtures: true });
+        setSelectedCampaign(saved);
+        setCampaigns((previous) => previous.map((campaign) => (campaign.id === saved.id ? saved : campaign)));
+        setDataError(null);
+        return;
+      }
+
+      if (!organization) {
+        throw new ServiceError('forbidden', 'Sign in to update a live campaign.');
+      }
+      const saved = await CampaignService.updateCampaign(organization.id, updated, profile?.id);
       setSelectedCampaign(saved);
-      setCampaigns((previous) => previous.map((campaign) => campaign.id === saved.id ? saved : campaign));
+      setCampaigns((previous) => previous.map((campaign) => (campaign.id === saved.id ? saved : campaign)));
       setDataError(null);
     } catch (error: unknown) {
       setDataError(error instanceof Error ? error.message : 'Campaign update failed.');
@@ -150,15 +193,24 @@ export function App() {
       status: 'draft',
       sourceData,
       designConfigs: CampaignStore.createDefaultDesignConfigs(),
-      tags: [sourceData.campaignType],
+      tags: [sourceData.campaignType, ...(runtimeMode === 'demo' ? ['Demo', 'Fictional'] : [])],
     };
 
     try {
-      const saved = runtimeMode === 'live'
-        ? organization
-          ? await CampaignService.createCampaign(organization.id, draft, profile?.id)
-          : (() => { throw new ServiceError('forbidden', 'Sign in to create a live campaign.'); })()
-        : await CampaignService.createCampaign('', draft, profile?.id);
+      if (runtimeMode === 'demo') {
+        const localId = `demo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const saved = CampaignStore.save({ ...draft, id: localId }, { allowDemoFixtures: true });
+        setCampaigns((previous) => [saved, ...previous]);
+        setSelectedCampaign(saved);
+        setActiveView('workspace');
+        setDataError(null);
+        return;
+      }
+
+      if (!organization) {
+        throw new ServiceError('forbidden', 'Sign in to create a live campaign.');
+      }
+      const saved = await CampaignService.createCampaign(organization.id, draft, profile?.id);
       setCampaigns((previous) => [saved, ...previous]);
       setSelectedCampaign(saved);
       setActiveView('workspace');
@@ -170,7 +222,17 @@ export function App() {
 
   const handleDuplicateCampaign = async (id: string) => {
     try {
-      const duplicated = await CampaignService.duplicateCampaign(id, runtimeMode === 'live' ? organization?.id || '' : '', profile?.id);
+      if (runtimeMode === 'demo') {
+        const duplicated = CampaignStore.duplicate(id);
+        if (duplicated) setCampaigns((previous) => [duplicated, ...previous]);
+        else setDataError('Campaign was not found.');
+        return;
+      }
+
+      if (!organization) {
+        throw new ServiceError('forbidden', 'Sign in to duplicate a live campaign.');
+      }
+      const duplicated = await CampaignService.duplicateCampaign(id, organization.id, profile?.id);
       if (duplicated) setCampaigns((previous) => [duplicated, ...previous]);
       else setDataError('Campaign was not found.');
     } catch (error: unknown) {
@@ -180,7 +242,21 @@ export function App() {
 
   const handleDeleteCampaign = async (id: string) => {
     try {
-      await CampaignService.deleteCampaign(id, runtimeMode === 'live' ? organization?.id : undefined);
+      if (runtimeMode === 'demo') {
+        CampaignStore.delete(id);
+        setCampaigns((previous) => previous.filter((campaign) => campaign.id !== id));
+        if (selectedCampaign?.id === id) {
+          setSelectedCampaign(null);
+          setActiveView('campaigns');
+        }
+        setDataError(null);
+        return;
+      }
+
+      if (!organization) {
+        throw new ServiceError('forbidden', 'Sign in to delete a live campaign.');
+      }
+      await CampaignService.deleteCampaign(id, organization.id);
       setCampaigns((previous) => previous.filter((campaign) => campaign.id !== id));
       if (selectedCampaign?.id === id) {
         setSelectedCampaign(null);
@@ -194,13 +270,20 @@ export function App() {
 
   const handleSaveBrandKit = async (updated: BrandKit) => {
     try {
-      const saved = runtimeMode === 'live'
-        ? organization
-          ? hasPersistedBrandKit
-            ? await BrandKitService.updateBrandKit(organization.id, updated)
-            : await BrandKitService.createBrandKit(organization.id, updated)
-          : (() => { throw new ServiceError('forbidden', 'Sign in to save a live brand kit.'); })()
-        : await BrandKitService.saveBrandKit('', updated);
+      if (runtimeMode === 'demo') {
+        const saved = BrandKitStore.save(updated);
+        setBrandKit(saved);
+        setHasPersistedBrandKit(true);
+        setDataError(null);
+        return;
+      }
+
+      if (!organization) {
+        throw new ServiceError('forbidden', 'Sign in to save a live brand kit.');
+      }
+      const saved = hasPersistedBrandKit
+        ? await BrandKitService.updateBrandKit(organization.id, updated)
+        : await BrandKitService.createBrandKit(organization.id, updated);
       setBrandKit(saved);
       setHasPersistedBrandKit(true);
       setDataError(null);
@@ -227,7 +310,7 @@ export function App() {
     // Resolve presenter campaign
     let presenterCampaign = campaigns.find((c) => c.id === presenterCampaignId);
 
-    if (!presenterCampaign && runtimeMode === 'demo') {
+    if (!presenterCampaign) {
       presenterCampaign =
         CampaignStore.getById(presenterCampaignId, { allowDemoFixtures: true }) ||
         SAMPLE_CAMPAIGNS.find((c) => c.id === presenterCampaignId);
@@ -257,7 +340,12 @@ export function App() {
           >
             Return to Dashboard
           </a>
-          <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onAuthSuccess={() => { void loadData(); setIsAuthModalOpen(false); }} />
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+            onAuthSuccess={() => { void loadData(); setIsAuthModalOpen(false); }}
+            onEnterDemo={handleEnterDemo}
+          />
         </div>
       );
     }
@@ -319,12 +407,50 @@ export function App() {
       brandKit={brandKit}
       profile={profile}
       organization={organization}
+      runtimeMode={runtimeMode}
+      onExitDemo={runtimeMode === 'demo' ? handleExitDemo : undefined}
       onOpenAuth={() => setIsAuthModalOpen(true)}
       onSignOut={() => void handleSignOut()}
     >
-      <div className={`mb-5 px-4 py-3 rounded-xl border text-xs ${runtimeMode === 'live' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-        <span className="font-mono font-bold uppercase tracking-wider">{runtimeMode === 'live' ? 'Live workspace' : 'Demo fixture workspace'}</span>
-        <span className="ml-2">{runtimeMode === 'live' ? 'Data and AI operations require an authenticated organization.' : 'Fictional campaigns are local fixtures and are never used as live data.'}</span>
+      <div className={`mb-5 p-3.5 sm:p-4 rounded-xl border text-xs flex flex-wrap items-center justify-between gap-3 ${
+        runtimeMode === 'live'
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+          : 'bg-amber-50 border-amber-300 text-amber-900 shadow-sm'
+      }`}>
+        <div>
+          <span className="font-mono font-bold uppercase tracking-wider">
+            {runtimeMode === 'live' ? 'Live workspace' : 'DEMO WORKSPACE · FICTIONAL DATA'}
+          </span>
+          <span className="ml-2">
+            {runtimeMode === 'live'
+              ? 'Data and AI operations require an authenticated organization.'
+              : 'Fictional campaigns are local fixtures and are never used as live data.'}
+          </span>
+        </div>
+        {runtimeMode === 'demo' && (
+          <div className="flex items-center gap-2">
+            {campaigns.some((c) => c.id === 'campaign-phoenix-fix-flip') && (
+              <button
+                type="button"
+                onClick={() => {
+                  const phx = campaigns.find((c) => c.id === 'campaign-phoenix-fix-flip');
+                  if (phx) handleSelectCampaign(phx);
+                }}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Presentation className="w-3.5 h-3.5" />
+                <span>Open Flagship Demo</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleExitDemo}
+              className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+            >
+              Exit Demo
+            </button>
+          </div>
+        )}
       </div>
 
       {dataError && (
@@ -334,7 +460,13 @@ export function App() {
       )}
 
       {activeView === 'dashboard' && (
-        <DashboardOverview campaigns={campaigns} brandKit={brandKit} onSelectCampaign={handleSelectCampaign} onNewCampaign={() => setActiveView('new_campaign')} onNavigate={(view) => setActiveView(view)} />
+        <DashboardOverview
+          campaigns={campaigns}
+          brandKit={brandKit}
+          onSelectCampaign={handleSelectCampaign}
+          onNewCampaign={() => setActiveView('new_campaign')}
+          onNavigate={(view) => setActiveView(view)}
+        />
       )}
 
       {activeView === 'campaigns' && (
@@ -381,7 +513,12 @@ export function App() {
       {activeView === 'leads' && <LeadFinder />}
       {activeView === 'settings' && <SettingsView organizationId={organization?.id} />}
 
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onAuthSuccess={() => { void loadData(); setIsAuthModalOpen(false); }} />
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={() => { void loadData(); setIsAuthModalOpen(false); }}
+        onEnterDemo={handleEnterDemo}
+      />
     </AppShell>
   );
 }

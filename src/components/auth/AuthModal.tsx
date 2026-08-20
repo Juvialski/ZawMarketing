@@ -7,12 +7,14 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAuthSuccess: () => void;
+  onEnterDemo?: () => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   onAuthSuccess,
+  onEnterDemo,
 }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -53,12 +55,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const handleDemoLogin = () => {
-    if (isSupabaseConfigured()) {
-      setErrorMsg('Demo workspace is available only when the live backend is unconfigured.');
+    if (onEnterDemo) {
+      onEnterDemo();
+      onClose();
       return;
     }
-    onAuthSuccess();
-    onClose();
+    const url = new URL(window.location.href);
+    url.searchParams.set('demo', '1');
+    url.searchParams.delete('presenter');
+    url.searchParams.delete('campaign');
+    window.location.assign(url.toString());
   };
 
   return (
@@ -112,9 +118,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="button"
             onClick={handleDemoLogin}
-            disabled={isSupabaseConfigured()}
-            aria-disabled={isSupabaseConfigured()}
-            className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm transition-colors"
+            className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm transition-colors cursor-pointer"
           >
             Launch Fictional Demo Workspace
           </button>

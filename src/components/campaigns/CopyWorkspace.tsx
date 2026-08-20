@@ -49,7 +49,7 @@ export const CopyWorkspace: React.FC<CopyWorkspaceProps> = ({
     setProgressMsg('Writing platform-specific copy packages...');
 
     try {
-      const provider = ProviderManager.getAIProvider();
+      const provider = ProviderManager.getAIProvider(runtimeMode);
       const generated = await provider.generateCopy(
         campaign.sourceData,
         campaign.strategy,
@@ -140,7 +140,7 @@ export const CopyWorkspace: React.FC<CopyWorkspaceProps> = ({
   const quality = copy.qualityReport;
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-[1500px] mx-auto">
       {/* 1. Header & Anti-Slop Score Banner */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-subtle flex flex-wrap items-center justify-between gap-4">
         <div>

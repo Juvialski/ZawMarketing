@@ -62,7 +62,7 @@ export const LeadFinder: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-[1500px] mx-auto">
       {/* 1. Header */}
       <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-subtle flex flex-wrap items-center justify-between gap-4">
         <div>
