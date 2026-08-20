@@ -66,7 +66,13 @@ export interface CampaignImage {
   altText?: string;
   aiPrompt?: string;
   isAiIllustrative?: boolean;
+  isConceptual?: boolean;
+  estimatedCostUsd?: number;
+  provider?: string;
+  model?: string;
 }
+
+import { GenerationMetadata } from './providers';
 
 export interface CampaignStrategy {
   targetAudience: {
@@ -82,6 +88,7 @@ export interface CampaignStrategy {
   supportingEvidence: string[];
   ctaStrategy: string;
   suggestedPlatforms: ('facebook' | 'instagram' | 'linkedin' | 'email' | 'video_reels')[];
+  generationMetadata?: GenerationMetadata;
 }
 
 export interface PlatformCopyItem {
@@ -143,6 +150,7 @@ export interface CampaignCopy {
   };
   videoScript: VideoScript;
   qualityReport?: CopyQualityReport;
+  generationMetadata?: GenerationMetadata;
 }
 
 export type DesignTemplateFamily = 
@@ -199,4 +207,5 @@ export interface Campaign {
   designConfigs: Record<OutputAspectRatio, GraphicDesignConfig>;
   brandKitId?: string;
   tags: string[];
+  generationMetadata?: GenerationMetadata;
 }

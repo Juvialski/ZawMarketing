@@ -4,6 +4,7 @@ import { BrandKit } from '../../types/brandKit';
 import { ProviderManager } from '../../services/providers/aiProvider';
 import { DesignRenderer } from '../designs/DesignRenderer';
 import { MarketingKitZipExporter } from '../../services/export/marketingKitZip';
+import { SettingsStore } from '../../services/storage/settingsStore';
 import { 
   Sparkles, 
   Download, 
@@ -11,7 +12,10 @@ import {
   FileText, 
   Image as ImageIcon, 
   Share2,
-  Check
+  Check,
+  AlertCircle,
+  Award,
+  Cpu
 } from 'lucide-react';
 
 interface FullMarketingKitViewProps {
@@ -26,50 +30,49 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
   onUpdateCampaign,
 }) => {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [isReviewingPremium, setIsReviewingPremium] = useState(false);
   const [currentStepName, setCurrentStepName] = useState('');
   const [progressPercent, setProgressPercent] = useState(0);
   const [isZipping, setIsZipping] = useState(false);
   const [zipMessage, setZipMessage] = useState('');
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
+
+  const config = SettingsStore.get();
 
   const handleGenerateFullKit = async () => {
     setIsGeneratingAll(true);
     setProgressPercent(10);
-    setCurrentStepName('Phase 1: Synthesizing Campaign Strategy & Audience Hooks...');
+    setCurrentStepName('Phase 1: Initializing Quota-Aware Campaign Pipeline...');
+    setFallbackNotice(null);
 
     try {
       const ai = ProviderManager.getAIProvider();
 
-      // Step 1: Strategy
-      const strategy = await ai.generateStrategy(
+      // Single-turn full kit generation to conserve quota
+      const result = await ai.generateFullMarketingKit(
         campaign.sourceData,
         brandKit,
         (step, pct) => {
           setCurrentStepName(step);
-          setProgressPercent(Math.round(pct * 0.4));
+          setProgressPercent(pct);
         }
       );
 
-      // Step 2: Copy
-      setCurrentStepName('Phase 2: Writing Multi-Platform Copy & Video Scripts...');
-      const copy = await ai.generateCopy(
-        campaign.sourceData,
-        strategy,
-        brandKit,
-        (step, pct) => {
-          setCurrentStepName(step);
-          setProgressPercent(40 + Math.round(pct * 0.5));
-        }
-      );
+      if (result.metadata.fallbackOccurred) {
+        setFallbackNotice(
+          `Generated using ${result.metadata.actualModel} because ${result.metadata.requestedModel} reached its quota limit or was unavailable.`
+        );
+      }
 
-      // Step 3: Complete Campaign
-      setCurrentStepName('Phase 3: Building Deterministic Graphic Renderings...');
+      setCurrentStepName('Phase 2: Building Deterministic Graphic Renderings...');
       setProgressPercent(95);
 
       const updatedCampaign: Campaign = {
         ...campaign,
         status: 'completed',
-        strategy,
-        copy,
+        strategy: result.strategy,
+        copy: result.copy,
+        generationMetadata: result.metadata,
       };
 
       onUpdateCampaign(updatedCampaign);
@@ -77,9 +80,41 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
       setCurrentStepName('Full Marketing Kit Package Ready!');
     } catch (err) {
       console.error('Failed to generate full marketing kit', err);
-      alert('Generation encountered an error. Please try again.');
+      alert('Generation encountered an error. Please check your provider settings.');
     } finally {
       setIsGeneratingAll(false);
+    }
+  };
+
+  const handleProfessionalReview = async () => {
+    if (!campaign.copy) return;
+    setIsReviewingPremium(true);
+    try {
+      const ai = ProviderManager.getAIProvider();
+      const premiumModelId = config.premiumModelId || 'gemini-3.7-flash';
+      
+      const qualityReport = await ai.reviewCopyQuality(
+        campaign.copy,
+        campaign.sourceData,
+        brandKit,
+        { modelId: premiumModelId }
+      );
+
+      const updatedCopy = {
+        ...campaign.copy,
+        qualityReport,
+      };
+
+      onUpdateCampaign({
+        ...campaign,
+        copy: updatedCopy,
+      });
+
+      alert(`Professional Review completed via ${premiumModelId}. Quality Score: ${qualityReport.overallScore}/100.`);
+    } catch (err) {
+      console.warn('Professional Review failed', err);
+    } finally {
+      setIsReviewingPremium(false);
     }
   };
 
@@ -104,6 +139,7 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
   };
 
   const isKitReady = Boolean(campaign.strategy && campaign.copy);
+  const metadata = campaign.generationMetadata || campaign.copy?.generationMetadata;
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -117,12 +153,18 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
             <span className="text-xs text-slate-500 font-mono">
               Status: {campaign.status.toUpperCase()}
             </span>
+            {metadata && (
+              <span className="text-[10px] font-mono bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded flex items-center gap-1">
+                <Cpu className="w-3 h-3 text-slate-500" />
+                {metadata.actualModel}
+              </span>
+            )}
           </div>
           <h2 className="text-2xl font-serif font-bold text-slate-900 mt-2">
             Full Marketing Kit Studio
           </h2>
           <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-            Generate and export the entire asset suite in one coordinated pipeline: strategy brief, multi-platform copy, short-form video reel script, 4 social graphic variants, and a printable investment memorandum flyer.
+            Generate and export the entire asset suite in a single quota-efficient pipeline: strategy brief, multi-platform copy, short-form video reel script, 4 social graphic variants, and a printable investment memorandum flyer.
           </p>
         </div>
 
@@ -141,17 +183,41 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
           </button>
 
           {isKitReady && (
-            <button
-              onClick={handleDownloadZip}
-              disabled={isZipping}
-              className="w-full sm:w-auto px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-            >
-              <Download className="w-4 h-4" />
-              <span>{isZipping ? zipMessage || 'Packaging ZIP...' : 'Download Kit (.ZIP)'}</span>
-            </button>
+            <>
+              <button
+                onClick={handleProfessionalReview}
+                disabled={isReviewingPremium}
+                className="w-full sm:w-auto px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold uppercase tracking-wider rounded-xl border border-slate-200 shadow-sm flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                title="Run deep underwriting & compliance review with Gemini 3.7 Flash"
+              >
+                {isReviewingPremium ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-amber-600" />
+                ) : (
+                  <Award className="w-4 h-4 text-amber-600" />
+                )}
+                <span>{isReviewingPremium ? 'Reviewing...' : 'Professional Review'}</span>
+              </button>
+
+              <button
+                onClick={handleDownloadZip}
+                disabled={isZipping}
+                className="w-full sm:w-auto px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" />
+                <span>{isZipping ? zipMessage || 'Packaging ZIP...' : 'Download Kit (.ZIP)'}</span>
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Fallback Notice Banner */}
+      {fallbackNotice && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>{fallbackNotice}</span>
+        </div>
+      )}
 
       {/* 2. Generation Progress Tracker */}
       {isGeneratingAll && (

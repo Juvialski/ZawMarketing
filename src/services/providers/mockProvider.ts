@@ -1,4 +1,4 @@
-import { IAIProvider, GenerationProgressCallback } from '../../types/providers';
+import { IAIProvider, GenerationProgressCallback, GenerationOptions, FullKitGenerationResult } from '../../types/providers';
 import { CampaignSourceData, CampaignStrategy, CampaignCopy, CopyQualityReport } from '../../types/campaign';
 import { BrandKit } from '../../types/brandKit';
 import { AntiSlopCritic } from '../marketing/antiSlopCritic';
@@ -18,14 +18,15 @@ export class MockAIProvider implements IAIProvider {
     if (!onProgress) return;
     for (const step of steps) {
       onProgress(step.name, step.percent, step.detail);
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
 
   public async generateStrategy(
     sourceData: CampaignSourceData,
     brandKit: BrandKit,
-    onProgress?: GenerationProgressCallback
+    onProgress?: GenerationProgressCallback,
+    _options?: GenerationOptions
   ): Promise<CampaignStrategy> {
     await this.simulateProgress(
       [
@@ -76,6 +77,13 @@ export class MockAIProvider implements IAIProvider {
       ],
       ctaStrategy: `Drive qualified prospects directly to the complete underwriting pro forma and due diligence package.`,
       suggestedPlatforms: ['facebook', 'instagram', 'linkedin', 'email', 'video_reels'],
+      generationMetadata: {
+        requestedModel: 'mock-provider',
+        actualModel: 'mock-provider',
+        fallbackOccurred: false,
+        latencyMs: 150,
+        timestamp: new Date().toISOString(),
+      },
     };
   }
 
@@ -83,7 +91,8 @@ export class MockAIProvider implements IAIProvider {
     sourceData: CampaignSourceData,
     strategy: CampaignStrategy,
     brandKit: BrandKit,
-    onProgress?: GenerationProgressCallback
+    onProgress?: GenerationProgressCallback,
+    _options?: GenerationOptions
   ): Promise<CampaignCopy> {
     await this.simulateProgress(
       [
@@ -190,6 +199,13 @@ export class MockAIProvider implements IAIProvider {
       linkedin,
       emailNewsletter,
       videoScript,
+      generationMetadata: {
+        requestedModel: 'mock-provider',
+        actualModel: 'mock-provider',
+        fallbackOccurred: false,
+        latencyMs: 180,
+        timestamp: new Date().toISOString(),
+      },
     };
 
     const qualityReport = AntiSlopCritic.reviewCampaignCopy(copyObj, sourceData, brandKit);
@@ -198,10 +214,36 @@ export class MockAIProvider implements IAIProvider {
     return copyObj;
   }
 
+  public async generateFullMarketingKit(
+    sourceData: CampaignSourceData,
+    brandKit: BrandKit,
+    onProgress?: GenerationProgressCallback,
+    options?: GenerationOptions
+  ): Promise<FullKitGenerationResult> {
+    onProgress?.('Synthesizing Strategy & Multi-Platform Copy (Single-Turn Batch)...', 30);
+    const strategy = await this.generateStrategy(sourceData, brandKit, onProgress, options);
+    onProgress?.('Generating Multi-Platform Copy & Video Script...', 70);
+    const copy = await this.generateCopy(sourceData, strategy, brandKit, onProgress, options);
+    onProgress?.('Validating Anti-Slop Rules & Schema...', 100);
+
+    return {
+      strategy,
+      copy,
+      metadata: {
+        requestedModel: 'mock-provider',
+        actualModel: 'mock-provider',
+        fallbackOccurred: false,
+        latencyMs: 300,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+
   public async reviewCopyQuality(
     copy: CampaignCopy,
     sourceData: CampaignSourceData,
-    brandKit: BrandKit
+    brandKit: BrandKit,
+    _options?: GenerationOptions
   ): Promise<CopyQualityReport> {
     return AntiSlopCritic.reviewCampaignCopy(copy, sourceData, brandKit);
   }

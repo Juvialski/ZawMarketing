@@ -10,7 +10,9 @@ import {
   Compass, 
   Flame, 
   Layers,
-  ArrowRight
+  ArrowRight,
+  Cpu,
+  AlertCircle
 } from 'lucide-react';
 
 interface StrategyWorkspaceProps {
@@ -29,10 +31,12 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
   const [strategy, setStrategy] = useState<CampaignStrategy | undefined>(campaign.strategy);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progressMsg, setProgressMsg] = useState<string>('');
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
 
   const handleGenerateStrategy = async () => {
     setIsGenerating(true);
     setProgressMsg('Analyzing source data & target market economics...');
+    setFallbackNotice(null);
 
     try {
       const provider = ProviderManager.getAIProvider();
@@ -41,6 +45,13 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
         brandKit,
         (step) => setProgressMsg(step)
       );
+
+      if (generated.generationMetadata?.fallbackOccurred) {
+        setFallbackNotice(
+          `Generated via fallback model: ${generated.generationMetadata.actualModel} (${generated.generationMetadata.fallbackReason || 'quota limit'})`
+        );
+      }
+
       setStrategy(generated);
       onSaveStrategy(generated);
     } catch (err) {
@@ -78,14 +89,24 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
     );
   }
 
+  const metadata = strategy.generationMetadata;
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       {/* Top Banner */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-subtle flex flex-wrap items-center justify-between gap-4">
         <div>
-          <span className="text-[10px] font-mono uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-            STRATEGY DOSSIER
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+              STRATEGY DOSSIER
+            </span>
+            {metadata && (
+              <span className="text-[10px] font-mono bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded flex items-center gap-1">
+                <Cpu className="w-3 h-3 text-slate-500" />
+                {metadata.actualModel}
+              </span>
+            )}
+          </div>
           <h2 className="text-xl font-serif font-bold text-slate-900 mt-1">
             Marketing Intelligence & Positioning
           </h2>
@@ -115,6 +136,13 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
           )}
         </div>
       </div>
+
+      {fallbackNotice && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-3.5 rounded-xl text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>{fallbackNotice}</span>
+        </div>
+      )}
 
       {/* Strategy Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

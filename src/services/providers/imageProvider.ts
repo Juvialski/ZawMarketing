@@ -1,5 +1,16 @@
-import { IImageProvider, GeneratedImageResult } from '../../types/providers';
+import { 
+  IImageProvider, 
+  GeneratedImageResult, 
+  ImageCreativeBrief, 
+  ProviderConfig 
+} from '../../types/providers';
 import { GoogleGenAI } from '@google/genai';
+import { UsageTracker } from './usageTracker';
+import { CreativeBriefComposer } from './creativeBriefComposer';
+import { BflImageProvider } from './bflImageProvider';
+import { GeminiPaidImageProvider } from './geminiImageProvider';
+import { OpenAiImageProvider } from './openaiImageProvider';
+import { NvidiaImageProvider } from './nvidiaImageProvider';
 
 export const CURATED_STOCK_PHOTOS = [
   {
@@ -52,6 +63,10 @@ export const CURATED_STOCK_PHOTOS = [
   },
 ];
 
+/**
+ * Priority 1 & 4: Upload-Only / Curated Real Photography Provider
+ * Ensures the application is 100% usable without any generative AI image provider.
+ */
 export class UploadOnlyProvider implements IImageProvider {
   public id = 'upload-provider';
   public name = 'Authentic Photography (Upload Only)';
@@ -62,9 +77,9 @@ export class UploadOnlyProvider implements IImageProvider {
 
   public async generateConceptImage(
     _prompt: string,
-    _aspectRatio: '1:1' | '4:5' | '16:9' | '9:16'
+    _aspectRatio: '1:1' | '4:5' | '16:9' | '9:16' = '1:1',
+    _contextNotes?: string
   ): Promise<GeneratedImageResult> {
-    // Select the best matching curated architectural photo
     const randomIndex = Math.floor(Math.random() * CURATED_STOCK_PHOTOS.length);
     const photo = CURATED_STOCK_PHOTOS[randomIndex];
 
@@ -74,19 +89,63 @@ export class UploadOnlyProvider implements IImageProvider {
       altText: photo.name,
       isAiIllustrative: false,
       provider: 'authentic_curated_stock',
+      metadata: {
+        estimatedCostUsd: 0.0,
+      },
+    };
+  }
+
+  public async generateFromBrief(
+    brief: ImageCreativeBrief,
+    _onProgress?: (step: string, percent: number) => void
+  ): Promise<GeneratedImageResult> {
+    // If brief purpose matches category, pick matching photo
+    const categoryMap: Record<string, string> = {
+      hero: 'exterior',
+      supporting: 'interior',
+      background: 'interior',
+      editorial: 'exterior',
+      renovation_concept: 'exterior',
+      neighborhood_lifestyle: 'neighborhood',
+    };
+
+    const targetCategory = categoryMap[brief.purpose] || 'exterior';
+    const matches = CURATED_STOCK_PHOTOS.filter((p) => p.category === targetCategory);
+    const pool = matches.length > 0 ? matches : CURATED_STOCK_PHOTOS;
+    const photo = pool[Math.floor(Math.random() * pool.length)];
+
+    return {
+      id: `sample-photo-${Date.now()}`,
+      url: photo.url,
+      altText: photo.name,
+      isAiIllustrative: false,
+      provider: 'authentic_curated_stock',
+      metadata: {
+        modelId: 'curated-stock-fixture',
+        prompt: brief.subject,
+        estimatedCostUsd: 0.0,
+      },
     };
   }
 }
 
+// Alias for backwards compatibility
+export const UploadImageProvider = UploadOnlyProvider;
+
+/**
+ * Priority 3: Gemini Image Engine (Legacy & 0-Quota Fallback)
+ */
 export class GeminiImageProvider implements IImageProvider {
   public id = 'gemini-image-provider';
   public name = 'Gemini Illustrative Concept Engine';
-  private apiKey: string;
+  private apiKey?: string;
   private modelName: string;
+  private uploadFallback: UploadOnlyProvider;
 
-  constructor(apiKey: string, modelName = 'gemini-3.1-flash-image-preview') {
+  constructor(apiKey?: string, modelName = 'imagen-3.0-generate-002') {
     this.apiKey = apiKey;
     this.modelName = modelName;
+    this.uploadFallback = new UploadOnlyProvider();
   }
 
   public isConfigured(): boolean {
@@ -95,50 +154,105 @@ export class GeminiImageProvider implements IImageProvider {
 
   public async generateConceptImage(
     prompt: string,
-    aspectRatio: '1:1' | '4:5' | '16:9' | '9:16',
+    aspectRatio: '1:1' | '4:5' | '16:9' | '9:16' = '1:1',
     contextNotes?: string
   ): Promise<GeneratedImageResult> {
+    const brief: ImageCreativeBrief = {
+      purpose: 'hero',
+      subject: prompt,
+      aspectRatio,
+      constraints: contextNotes,
+    };
+    return this.generateFromBrief(brief);
+  }
+
+  public async generateFromBrief(
+    brief: ImageCreativeBrief,
+    onProgress?: (step: string, percent: number) => void
+  ): Promise<GeneratedImageResult> {
     if (!this.isConfigured()) {
-      const uploadFallback = new UploadOnlyProvider();
-      return uploadFallback.generateConceptImage(prompt, aspectRatio);
+      return this.uploadFallback.generateFromBrief(brief);
     }
 
+    const startTime = Date.now();
+    const refinedPrompt = CreativeBriefComposer.briefToPrompt(brief);
+
     try {
-      const ai = new GoogleGenAI({ apiKey: this.apiKey });
-      const refinedPrompt = `High-end architectural concept rendering, professional architectural photography style, clean natural daylight, realistic materials, no text, no watermarks, no distorted geometry. Theme: ${prompt}. Context: ${contextNotes || ''}`;
+      onProgress?.('Generating visual concept with Gemini Image...', 40);
+      const ai = new GoogleGenAI({ apiKey: this.apiKey! });
 
       const response = await ai.models.generateContent({
         model: this.modelName,
         contents: refinedPrompt,
       });
 
-      // If image bytes/parts are returned in response
-      // @ts-ignore
-      const candidates = response.candidates;
+      const candidates = (response as any).candidates;
       if (candidates && candidates[0]?.content?.parts) {
         for (const part of candidates[0].content.parts) {
-          // @ts-ignore
           if (part.inlineData && part.inlineData.data) {
-            // @ts-ignore
             const base64Url = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+            const latencyMs = Date.now() - startTime;
+
+            UsageTracker.recordUsage({
+              provider: 'gemini_image',
+              model: this.modelName,
+              operation: 'general_generation',
+              success: true,
+              latencyMs,
+            });
+
             return {
               id: `gemini-img-${Date.now()}`,
               url: base64Url,
-              altText: `AI Illustrative Concept: ${prompt}`,
+              altText: `AI Illustrative Concept: ${brief.subject}`,
               isAiIllustrative: true,
               provider: 'gemini_image',
+              metadata: {
+                modelId: this.modelName,
+                prompt: refinedPrompt,
+                latencyMs,
+                estimatedCostUsd: 0.0,
+              },
             };
           }
         }
       }
 
-      // Fallback if model did not return inline image
-      const uploadFallback = new UploadOnlyProvider();
-      return uploadFallback.generateConceptImage(prompt, aspectRatio);
+      console.info('Gemini image model returned no inline data. Using authentic photography fixture.');
+      return this.uploadFallback.generateFromBrief(brief);
     } catch (err) {
-      console.warn('Gemini image generation failed or unavailable, falling back to authentic photography fixture:', err);
-      const uploadFallback = new UploadOnlyProvider();
-      return uploadFallback.generateConceptImage(prompt, aspectRatio);
+      console.warn('Gemini image generation unavailable under current quota (0 RPD). Falling back to authentic photo fixture:', err);
+      return this.uploadFallback.generateFromBrief(brief);
     }
+  }
+}
+
+/**
+ * Unified Image Provider Router
+ * Resolves appropriate adapter based on settings, tiers, and spending limits.
+ */
+export class ImageProviderRouter {
+  public static getAdapterForConfig(config: ProviderConfig): IImageProvider {
+    const limits = config.imageSpendingLimits;
+
+    // If paid generation is enabled and a paid provider is configured:
+    if (limits?.enablePaidGeneration) {
+      if (limits.preferredPaidProvider === 'bfl' && config.bflApiKey) {
+        return new BflImageProvider(config.bflApiKey, limits.preferredPaidModel || 'flux-2-pro', config.bflBaseUrl);
+      }
+      if (limits.preferredPaidProvider === 'gemini_image' && config.geminiApiKey) {
+        return new GeminiPaidImageProvider(config.geminiApiKey, limits.preferredPaidModel || 'nano-banana-pro');
+      }
+      if (limits.preferredPaidProvider === 'openai_image' && config.openaiApiKey) {
+        return new OpenAiImageProvider(config.openaiApiKey, limits.preferredPaidModel || 'gpt-image-2', config.openaiBaseUrl);
+      }
+    }
+
+    // Default to Free / Dev: NVIDIA NIM or Uploads
+    if (config.nvidiaApiKey) {
+      return new NvidiaImageProvider(config.nvidiaApiKey, config.nvidiaModelId || 'stabilityai/sdxl-turbo', config.nvidiaBaseUrl);
+    }
+
+    return new UploadOnlyProvider();
   }
 }

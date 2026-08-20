@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { CampaignSourceData, CampaignType, CampaignImage } from '../../types/campaign';
 import { CURATED_STOCK_PHOTOS } from '../../services/providers/imageProvider';
 import { StorageService } from '../../services/supabase/storageService';
+import { DEFAULT_BRAND_KIT } from '../../types/brandKit';
+import { ImageGenerationModal } from '../images/ImageGenerationModal';
 import { 
   DollarSign, 
   Upload, 
@@ -28,6 +30,7 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
   onCancel,
 }) => {
   const [campaignType, setCampaignType] = useState<CampaignType>(initialData?.campaignType || 'fix_and_flip');
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [title, setTitle] = useState(initialData?.title || '');
   const [targetMarket, setTargetMarket] = useState(initialData?.targetMarket || 'Phoenix, AZ');
   const [address, setAddress] = useState(initialData?.property?.address || '');
@@ -426,15 +429,24 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
 
         {/* Upload Button & Quick Add */}
         <div className="flex flex-wrap items-center gap-3">
-          <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-sm">
+          <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors">
             {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
             <span>{isUploading ? 'Uploading to Storage...' : 'Upload Photos (Supabase)'}</span>
             <input type="file" multiple accept="image/*" onChange={handleImageUpload} disabled={isUploading} className="hidden" />
           </label>
 
-          <span className="text-xs text-slate-400">or add curated real estate photography:</span>
+          <button
+            type="button"
+            onClick={() => setIsImageModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-semibold rounded-lg shadow-sm transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <span>Generate AI Concept Visual</span>
+          </button>
+
+          <span className="text-xs text-slate-400">or add curated stock:</span>
           <div className="flex gap-1.5 overflow-x-auto py-1">
-            {CURATED_STOCK_PHOTOS.slice(0, 4).map((p) => (
+            {CURATED_STOCK_PHOTOS.slice(0, 3).map((p) => (
               <button
                 key={p.id}
                 type="button"
@@ -502,6 +514,21 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
           <span>Save & Proceed to Campaign Studio</span>
         </button>
       </div>
+
+      {/* Concept Image Generator Modal */}
+      <ImageGenerationModal
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        onImageGenerated={(newImg) => {
+          setUploadedImages((prev) => [...prev, newImg]);
+        }}
+        brandKit={DEFAULT_BRAND_KIT}
+        targetMarket={targetMarket}
+        propertyTitle={title || address || 'Residential Investment Property'}
+        propertyType={campaignType}
+        uploadedImages={uploadedImages}
+        campaignId={campaignId}
+      />
     </form>
   );
 };

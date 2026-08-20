@@ -2,143 +2,168 @@
 ## AI Real Estate Marketing & Business Automation Studio
 
 **Project Name:** `zaw-marketing-studio`  
-**Version:** 2.0.0 (Production Supabase Architecture)  
+**Version:** 2.2.0 (Dual-Tier AI Architecture: Gemini Marketing Intelligence & FLUX.2/NVIDIA Visual Engine)  
 **Target Audience:** Real Estate Investment Companies, Private Capital Funds, Value-Add Operators, Commercial Syndicators  
-**Primary Tech Stack:** React 18, TypeScript (Strict), Vite, Tailwind CSS, Supabase (`@supabase/supabase-js`), Lucide Icons, Vitest, `@google/genai`, `html-to-image`, `jspdf`, `jszip`
+**Primary Tech Stack:** React 18, TypeScript (Strict), Vite, Tailwind CSS, Supabase (`@supabase/supabase-js`), Lucide Icons, Vitest, `@google/genai`, Black Forest Labs API (`bfl`), NVIDIA NIM, `html-to-image`, `jspdf`, `jszip`
 
 ---
 
-## 1. Supabase Backend Architecture & Specifications
+## 1. AI Provider Architecture & Quota Strategy
 
-### 1.1 Project Details
-* **Supabase Project Name:** `ZawMarketing`
-* **Project Ref:** `csolgywkgummefnwouny`
-* **Project URL:** `https://csolgywkgummefnwouny.supabase.co`
-* **GitHub Repository:** `https://github.com/Juvialski/ZawMarketing`
+### 1.1 Observed Project Quotas (Google AI Studio Dashboard)
+The system is configured with real observed Gemini project quotas:
 
----
-
-### 1.2 Migration Inventory (`supabase/migrations/`)
-All database tables, relationships, indexes, triggers, and Row Level Security (RLS) policies are version-controlled in the repository:
-
-1. **`supabase/migrations/20260820100000_initial_schema.sql`**:
-   - Extensions: `uuid-ossp`
-   - Tables created:
-     - `profiles`: User profiles linked to `auth.users(id)`.
-     - `organizations`: Multi-tenant workspaces with unique slugs.
-     - `organization_members`: Membership associations with roles (`owner`, `admin`, `member`).
-     - `brand_kits`: Firm identity, logo URLs, colors (JSONB), typography (JSONB), compliance disclaimers, and forbidden brand terms.
-     - `campaigns`: Property marketing campaigns with `source_data`, `strategy`, and `design_configs`.
-     - `campaign_content`: Revision history for generated copy, scripts, headlines, and quality audits.
-     - `campaign_assets`: Metadata for uploaded property photos, AI concepts, and rendered assets.
-     - `design_exports`: Rendered export metadata (format, dimensions, storage paths, file sizes).
-     - `lead_lists`: Investor search lists by metro area and buyer category.
-     - `leads`: Public business entities with deal relevance scores and tailored outreach angles.
-     - `ai_generation_logs`: Lightweight audit logging for provider, model, latency, and status.
-   - Indexes: Foreign key and filter indexes on `user_id`, `organization_id`, `campaign_id`, `list_id`.
-   - Security Definer Functions: `is_org_member(org_id, check_user_id)` and `get_user_organization_ids(check_user_id)`.
-   - Auto-Provisioning Trigger: `on_auth_user_created` trigger on `auth.users` that automatically initializes a profile, default organization, membership, and default brand kit on signup.
-
-2. **`supabase/migrations/20260820100001_storage_setup.sql`**:
-   - Buckets created:
-     - `brand-assets` (logos, typography assets)
-     - `property-media` (uploaded property photography)
-     - `campaign-assets` (AI concept images, supporting graphics)
-     - `campaign-exports` (rendered social PNGs, PDF flyers, ZIP bundles)
-   - Storage RLS policies for authenticated read/write and public asset read.
-
-3. **`supabase/seed.sql`**:
-   - Seed data for demo organization (`Apex Capital Partners`), default brand kit (`Apex Capital & Acquisitions`), 2 full campaigns (Phoenix Fix & Flip, Dallas Multi-Family), and sample investor leads.
+| Model ID | User-Facing Display Label | Observed RPM | Observed TPM | Observed RPD | Role / Tier |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `gemini-3.5-flash-lite` | **Recommended · High Volume** | 15 RPM | 250k TPM | **500 RPD** | **Default Model** (Routine Workloads) |
+| `gemini-3.1-flash-lite` | **High Volume Fallback** | 15 RPM | 250k TPM | **500 RPD** | **Primary High-Volume Fallback** |
+| `gemini-3.5-flash` | **Enhanced Quality · Limited** | 5 RPM | 250k TPM | **20 RPD** | Intermediate Quality Model |
+| `gemini-3.6-flash` | **Advanced · Limited** | 5 RPM | 250k TPM | **20 RPD** | Advanced Quantitative Synthesis |
+| `gemini-3.7-flash` | **Latest · Highest Quality · Limited** | 5 RPM | 250k TPM | **20 RPD** | **Preferred Premium Model** (Strategy/Review) |
 
 ---
 
-### 1.3 Row Level Security (RLS) Matrix
-RLS is enabled on **100% of application tables**:
-
-| Table | Policy Name | Access Type | Rule / Condition |
-| :--- | :--- | :--- | :--- |
-| `profiles` | Users can view own profile | SELECT | `auth.uid() = id` |
-| `profiles` | Users can update own profile | UPDATE | `auth.uid() = id` |
-| `organizations` | Members can view their organizations | SELECT | `id IN (SELECT get_user_organization_ids(auth.uid()))` |
-| `organization_members` | Members can view org members | SELECT | `organization_id IN (SELECT get_user_organization_ids(auth.uid()))` |
-| `brand_kits` | Org members can view/manage brand kits | ALL | `is_org_member(organization_id, auth.uid())` |
-| `campaigns` | Org members can view/manage campaigns | ALL | `is_org_member(organization_id, auth.uid())` |
-| `campaign_content` | Org members can view/manage content | ALL | `is_org_member(organization_id, auth.uid())` |
-| `campaign_assets` | Org members can view/manage assets | ALL | `is_org_member(organization_id, auth.uid())` |
-| `design_exports` | Org members can view/manage exports | ALL | `is_org_member(organization_id, auth.uid())` |
-| `lead_lists` & `leads` | Org members can view/manage leads | ALL | `is_org_member(organization_id, auth.uid())` |
-| `ai_generation_logs` | Org members can view ai logs | SELECT | `is_org_member(organization_id, auth.uid())` |
+### 1.2 Model Selection & Workload Allocation
+* **Default High-Volume Model (`gemini-3.5-flash-lite`)**:
+  - Handles campaign drafts, platform copy adaptations (LinkedIn, Instagram, Facebook, Email, Video Reel Script), headline variations, CTA options, rewriting, copy cleanup, structured JSON generation, lead summaries, and background batch operations.
+* **Preferred Premium Model (`gemini-3.7-flash`)**:
+  - Reserved for high-value reasoning: institutional acquisitions strategy, complex underwriting thesis synthesis, difficult property modeling, multimodal analysis, and optional second-pass **"Professional Review"**.
+* **Intermediate Models (`gemini-3.6-flash` / `gemini-3.5-flash`)**:
+  - Intermediate quality options and step-down fallbacks.
 
 ---
 
-### 1.4 Supabase Storage Strategy & Policies
-* Storage paths strictly follow the organization isolation pattern:
-  `{organizationId}/{campaignId}/{filename}`
-* **Buckets:**
-  - `brand-assets`: 10MB limit, PNG/JPEG/SVG/WEBP
-  - `property-media`: 25MB limit, PNG/JPEG/WEBP
-  - `campaign-assets`: 25MB limit, PNG/JPEG/WEBP
-  - `campaign-exports`: 50MB limit, PNG/JPEG/PDF/ZIP
+### 1.3 Quota Protection & Single-Turn Batch Generation
+To protect the scarce 20-RPD allowances on premium models and optimize the 500-RPD default tier:
+1. **Single-Request Full Marketing Kit**:
+   - The "Generate Full Marketing Kit" workflow executes **1 single structured JSON request** returning strategy, hooks, headlines, CTAs, Facebook post, Instagram caption, LinkedIn memo, Email newsletter, and 60s video script.
+   - Eliminates 5–8 individual API roundtrips.
+2. **On-Demand Premium Review**:
+   - Deep QA and legal compliance review using `gemini-3.7-flash` is triggered on-demand via the "Professional Review" button rather than automatically on every draft.
+3. **Deterministic Layout Isolation**:
+   - Zero AI calls are made on React component re-renders. Graphic layouts render deterministically via pure React/SVG.
 
 ---
 
-### 1.5 Server-Side AI Operations (Edge Functions in `supabase/functions/`)
-Server-side boundaries protect AI provider credentials:
+## 2. Visual Asset & Image Providers
 
-1. **`generate-campaign-strategy`**:
-   - Validates user JWT auth.
-   - Calls Google Gemini with server-side `GEMINI_API_KEY`.
-   - Returns structured `CampaignStrategy` JSON payload.
-   - Logs execution metrics in `ai_generation_logs`.
-2. **`generate-copy`**:
-   - Validates user JWT auth.
-   - Generates multi-platform copy (LinkedIn, Instagram, Facebook, Email, Video Reel Script).
-   - Enforces anti-slop rules on server.
-   - Logs latency and token metrics.
-3. **`critique-copy`**:
-   - Regulatory and anti-slop quality critic scoring copy from 0-100.
+Image generation is a **strictly decoupled concern** from marketing intelligence. Creative briefs are compiled into a provider-independent `ImageCreativeBrief` interface and routed to either free development or optional paid premium providers.
 
----
-
-### 1.6 Generated TypeScript Types
-* **File Location:** `src/types/database.types.ts`
-* **Regeneration Process:**
-  ```bash
-  npx supabase gen types typescript --project-id csolgywkgummefnwouny > src/types/database.types.ts
-  ```
+```
+Campaign Source Data + Brand Kit
+              ↓
+  CreativeBriefComposer
+              ↓
+      ImageCreativeBrief
+              ↓
+     ImageProviderRouter
+     ┌────────┴────────┐
+     ▼                 ▼
+FREE PROVIDERS     PAID PROVIDERS (Optional)
+• Real Uploads     • Black Forest Labs (FLUX.2 Pro / Max / Flex)
+• NVIDIA NIM       • Google Gemini (Nano Banana Pro)
+• Stock Fixtures   • OpenAI Image (Future Adapter)
+```
 
 ---
 
-### 1.7 Data Access Layer Architecture (`src/services/supabase/`)
-UI components never call raw SQL or un-typed queries. They access data via clean domain repositories:
-* `AuthService`: Sign up, sign in, sign out, user profiles, session listener, demo login.
-* `OrganizationService`: Workspace lookup, membership roles.
-* `CampaignService`: Campaigns CRUD, content revision history, duplication.
-* `BrandKitService`: Brand kit retrieval and persistence.
-* `StorageService`: Bucket upload, public URL generation, file replacement.
-* `LeadService`: Lead lists and lead search persistence.
-* `AILogService`: AI operation auditing and latency tracking.
+### 2.1 Free Providers (Development & Routine Concepts)
+
+#### 1. Authentic Photography (Upload-Only)
+* **Purpose:** Primary representation of actual listing condition, physical renovations, and factual deal materials.
+* **Implementation Status:** `LIVE` (Production Standard)
+* **Models:** `authentic-real-upload`, `curated-stock-fixture`
+* **Current Default:** **Priority 1 Default for Real Deals**
+* **API Adapter Location:** `src/services/providers/imageProvider.ts` (`UploadOnlyProvider`)
+* **Required Secret:** None (Uses Supabase Storage `property-media` bucket)
+* **Editing Support:** Manual crop, zoom, focal point adjust
+* **Multiple-Reference Support:** Yes (up to 20 uploaded photos)
+* **Cost Assumptions:** $0.00
+* **Resolution Support:** Original camera resolution up to 4K+
+* **Known Limitations:** Requires real photographer / user uploads.
+* **Fallback Behavior:** Curated architectural stock fixture.
+
+#### 2. NVIDIA NIM Visual Engine
+* **Purpose:** Free development visual concepts, neighborhood aerials, background textures, and preliminary prototypes.
+* **Implementation Status:** `LIVE` (Development Standard)
+* **Models:** `stabilityai/sdxl-turbo`, `black-forest-labs/flux-1-schnell`, `stabilityai/stable-diffusion-3-medium`
+* **Current Default:** `stabilityai/sdxl-turbo`
+* **API Adapter Location:** `src/services/providers/nvidiaImageProvider.ts`
+* **Required Secret:** `NVIDIA_API_KEY` (Server-side Edge Function or local settings)
+* **Editing Support:** Prompt-based regeneration
+* **Multiple-Reference Support:** No (text-to-image only)
+* **Cost Assumptions:** $0.00 (Hosted free development tier)
+* **Resolution Support:** 1024×1024, 896×1120, 1344×768, 768×1344
+* **Known Limitations:** Lower fine-grained architectural control; no direct reference conditioning.
+* **Fallback Behavior:** Curated architectural stock fixture.
 
 ---
 
-## 2. Deterministic Design Engine & Templates
+### 2.2 Paid Providers (Optional Maximum Quality & Production Standard)
 
-Located in `src/components/designs/`.
+#### 1. Black Forest Labs (FLUX.2)
+* **Purpose:** Premier photorealistic marketing hero assets, multi-reference architectural styling, and high-volume production social visuals.
+* **Implementation Status:** `LIVE` (Configurable / Opt-In)
+* **Models:**
+  * **`flux-2-max`** (Paid Maximum Quality): Flagship photorealism, fine architectural lighting, luxury finish precision.
+  * **`flux-2-pro`** (Paid Standard): Production social imagery, editorial concepts, multi-reference styling.
+  * **`flux-2-flex`** (Paid Specialized): Fine control over spatial composition and subtle typography inside imagery.
+* **Current Default:** `flux-2-max` for Hero visuals; `flux-2-pro` for supporting visuals.
+* **API Adapter Location:** `src/services/providers/bflImageProvider.ts`
+* **Required Secret:** `BFL_API_KEY` (Server-side Edge Function `generate-image` or local setting)
+* **Editing Support:** Image-to-image with `image_prompt_strength` (0.35 default for style transfer)
+* **Multiple-Reference Support:** Yes (Reference images passed via `image_prompt`)
+* **Cost Assumptions:**
+  * `flux-2-pro`: ~$0.05 / image
+  * `flux-2-max`: ~$0.08 / image
+  * `flux-2-flex`: ~$0.06 / image
+* **Resolution Support:** 1024×1024 (1:1), 896×1120 (4:5), 1344×768 (16:9), 768×1344 (9:16)
+* **Known Limitations:** Incurs API cost; requires deliberate workspace enablement.
+* **Fallback Behavior:** If unconfigured or budget exceeded $\to$ NVIDIA NIM or curated stock fixture (never spends money silently).
 
-### 2.1 Output Dimensions (`FORMAT_DIMENSIONS`):
-* **Instagram Square:** 1080×1080 (1:1)
-* **Instagram Portrait:** 1080×1350 (4:5)
-* **Story / Reel / TikTok:** 1080×1920 (9:16)
-* **Facebook / LinkedIn Banner:** 1200×630 (1.91:1)
-* **Printable Flyer (US Letter):** 2550×3300 @ 300 DPI (8.5" × 11")
-* **Printable Flyer (A4):** 2480×3508 @ 300 DPI (210mm × 297mm)
+#### 2. Google Gemini Image Engine (Nano Banana Pro / Imagen 3)
+* **Purpose:** Multimodal visual generation with brand asset grounding and creative adjustments.
+* **Implementation Status:** `LIVE` (Configurable / Opt-In)
+* **Models:** `nano-banana-pro`, `nano-banana-2`, `imagen-3.0-generate-002`
+* **Current Default:** `nano-banana-pro`
+* **API Adapter Location:** `src/services/providers/geminiImageProvider.ts`
+* **Required Secret:** `GEMINI_API_KEY`
+* **Editing Support:** Multimodal prompt editing
+* **Multiple-Reference Support:** Yes
+* **Cost Assumptions:** ~$0.04 / image
+* **Resolution Support:** 1024×1024, 1280×720
+* **Known Limitations:** Free project tier observed 0 RPD for Nano Banana; treated as paid.
+* **Fallback Behavior:** Curated stock fixture.
 
-### 2.2 Design Families:
-1. `Editorial Real Estate`: High-contrast serif typography (Playfair Display / Instrument Serif), warm paper background (`#fdfbf7`), terracotta accents.
-2. `Institutional Investment`: Dark navy (`#0a1128`), slate grid cards, amber metric badges.
-3. `Modern Brokerage`: Dark zinc backdrop, full-bleed hero photo with gradient overlay, bold emerald tags.
-4. `Direct Response Investor`: Conversion-focused, prominent gross equity spread callout ($285k entry $\to$ $390k ARV = $70k Spread).
-5. `Market Intelligence`: Macroeconomic analysis format with submarket takeaways, cap rate benchmarks, and key metric comparisons.
+#### 3. OpenAI Image Engine (Future Adapter)
+* **Purpose:** Future enterprise OpenAI image generation.
+* **Implementation Status:** `ADAPTER READY` (Inactive by default)
+* **Models:** `gpt-image-2`, `dall-e-3`
+* **Current Default:** `gpt-image-2`
+* **API Adapter Location:** `src/services/providers/openaiImageProvider.ts`
+* **Required Secret:** `OPENAI_API_KEY`
+* **Editing Support:** Inpainting / variation
+* **Cost Assumptions:** ~$0.06 / image
+* **Fallback Behavior:** Curated stock fixture.
+
+---
+
+### 2.3 Deliberate Cost Safety & Workspace Spending Controls
+* **Deliberate Enablement:** Paid image generation is **OFF by default** (`enablePaidGeneration: false`).
+* **No Silent Upgrades:** The application will **never** silently switch from Free to Paid when a free provider fails.
+* **Workspace Spending Limits (`src/services/providers/imageSpendingTracker.ts`):**
+  * `maxImagesPerCampaign`: Limits generated images per deal (default: 5).
+  * `dailySpendingLimitUsd`: Max USD spend per day (default: $5.00).
+  * `monthlySpendingLimitUsd`: Max USD spend per month (default: $50.00).
+* **Pre-Generation Cost Estimate:** UI displays estimated cost (e.g. `Est. ~$0.08`) before generation.
+* **Cost Metadata:** Every generated image records `estimatedCostUsd`, `provider`, `model`, and `timestamp`.
+
+---
+
+### 2.4 Strict Separation: Visual Asset vs. Graphic Design Engine
+* **AI image generators produce visual imagery only.**
+* Image generators **never** generate marketing flyers or typography containing text.
+* The deterministic React/SVG layout engine (`src/components/designs/`), typography pairs, and Brand Kit assemble the finished marketing designs.
 
 ---
 
@@ -151,11 +176,15 @@ npm.cmd test
 ```
 
 ### Verified Test Results:
+* `src/tests/modelRegistry.test.ts`: **8 tests passing** (Gemini 3.5 Flash Lite 500 RPD default, 3.1 Flash Lite 500 RPD fallback, 3.7 Flash 20 RPD premium, operation overrides, fallback chains).
+* `src/tests/imageProviderRegistry.test.ts`: **6 tests passing** (BFL FLUX.2 Pro/Max/Flex catalog, Gemini Nano Banana Pro, NVIDIA free tier, auto routing, creative brief composition).
+* `src/tests/imageCostSafety.test.ts`: **6 tests passing** (deliberate paid enablement, daily/monthly spending limit blockers, campaign image caps, unconfigured key fallbacks).
+* `src/tests/quotaAndFallback.test.ts`: **10 tests passing** (error classification, 429 quota routing, mock fallback, usage tracking, single-turn batch generation, image fallbacks).
 * `src/tests/antiSlopCritic.test.ts`: **5 tests passing** (slop pattern detection, regulatory claims, brand forbidden words, auto-cleaning, scoring).
 * `src/tests/strategyEngine.test.ts`: **2 tests passing** (strategy generation schema, multi-platform copy generation).
 * `src/tests/designLayoutStress.test.ts`: **7 tests passing** (currency formatting, number/percentage formatting, fix-and-flip metrics, multi-family metrics, zero-metric edge case, format dimensions, template families).
 * `src/tests/supabaseDataMapping.test.ts`: **4 tests passing** (project URL verification, multi-tenant storage path formatting, brand kit JSONB serialization, campaign row serialization).
-* **Total: 18 / 18 tests passing (100%).**
+* **Total: 48 / 48 tests passing (100%).**
 
 ---
 
@@ -163,47 +192,21 @@ npm.cmd test
 
 1. Clone or open the repository:
    ```bash
-   git clone https://github.com/Juvialski/ZawMarketing.git
+   cd ZawMarketing
    ```
 2. Install dependencies:
    ```bash
    npm.cmd install
    ```
-3. Set up environment:
-   ```bash
-   cp .env.example .env
-   ```
-   Add your `VITE_SUPABASE_ANON_KEY` and optional `VITE_GEMINI_API_KEY`.
-4. Run tests:
+3. Run test suite:
    ```bash
    npm.cmd test
    ```
-5. Start development server:
-   ```bash
-   npm.cmd run dev
-   ```
-6. Build for production:
+4. Build for production:
    ```bash
    npm.cmd run build
    ```
-
----
-
-## 5. Next Steps for Codex
-
-When auditing and extending this codebase:
-1. **Apply Migrations to Remote Supabase:**
+5. Start local development server:
    ```bash
-   npx supabase link --project-ref csolgywkgummefnwouny
-   npx supabase db push
+   npm.cmd run dev
    ```
-2. **Deploy Edge Functions:**
-   ```bash
-   npx supabase functions deploy generate-campaign-strategy
-   npx supabase functions deploy generate-copy
-   npx supabase functions deploy critique-copy
-   ```
-3. **Multimodal Vision Critic:**
-   - Add automated visual screenshot analysis using Gemini Vision to audit canvas contrast, safe zones, and text density.
-4. **CRM & Scheduled Publishing:**
-   - Extend the modular backend to support scheduled social media posts via webhooks.

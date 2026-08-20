@@ -36,7 +36,7 @@ serve(async (req) => {
       });
     }
 
-    const { sourceData, brandKit, organizationId, campaignId } = await req.json();
+    const { sourceData, brandKit, organizationId, campaignId, modelId } = await req.json();
     const apiKey = Deno.env.get('GEMINI_API_KEY');
 
     if (!apiKey) {
@@ -46,6 +46,7 @@ serve(async (req) => {
       );
     }
 
+    const targetModel = modelId || 'gemini-3.5-flash-lite';
     const prop = sourceData.property;
     const prompt = `You are an elite institutional real estate acquisitions strategist.
 Analyze this property and brand to build a quantitative marketing strategy.
@@ -72,7 +73,7 @@ Generate a structured JSON response matching this schema:
 }
 Avoid all AI cliches like "unlock the potential", "game-changer", or "nestled". Focus on hard numbers, margin spreads, and comps.`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -85,6 +86,11 @@ Avoid all AI cliches like "unlock the potential", "game-changer", or "nestled". 
       }),
     });
 
+    if (!geminiRes.ok) {
+      const errBody = await geminiRes.text();
+      throw new Error(`Gemini API error (HTTP ${geminiRes.status}): ${errBody}`);
+    }
+
     const geminiData = await geminiRes.json();
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
     const strategy = JSON.parse(rawText);
@@ -96,12 +102,12 @@ Avoid all AI cliches like "unlock the potential", "game-changer", or "nestled". 
       campaign_id: campaignId || null,
       operation_type: 'generate-strategy',
       provider: 'gemini',
-      model: 'gemini-2.5-flash',
+      model: targetModel,
       status: 'success',
       latency_ms: Date.now() - startTime,
     });
 
-    return new Response(JSON.stringify({ strategy }), {
+    return new Response(JSON.stringify({ strategy, model: targetModel }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {

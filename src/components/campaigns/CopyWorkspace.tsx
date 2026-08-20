@@ -131,6 +131,7 @@ export const CopyWorkspace: React.FC<CopyWorkspaceProps> = ({
     );
   }
 
+  const metadata = copy.generationMetadata;
   const quality = copy.qualityReport;
 
   return (
@@ -142,6 +143,11 @@ export const CopyWorkspace: React.FC<CopyWorkspaceProps> = ({
             <span className="text-[10px] font-mono uppercase tracking-widest text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
               COPY STUDIO
             </span>
+            {metadata && (
+              <span className="text-[10px] font-mono bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded">
+                Model: {metadata.actualModel}
+              </span>
+            )}
             {quality && (
               <span
                 className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded flex items-center gap-1 ${
@@ -183,6 +189,12 @@ export const CopyWorkspace: React.FC<CopyWorkspaceProps> = ({
           </button>
         </div>
       </div>
+
+      {metadata?.fallbackOccurred && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-3.5 rounded-xl text-xs">
+          Generated using {metadata.actualModel} because {metadata.requestedModel} reached quota limits.
+        </div>
+      )}
 
       {/* 2. Platform Selector Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto pb-px">
