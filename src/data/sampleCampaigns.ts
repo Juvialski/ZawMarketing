@@ -1,4 +1,5 @@
 import { Campaign } from '../types/campaign';
+import { generateDeterministicPresentationDeck } from '../features/presentations/services/demoDeckGenerator';
 
 export const SAMPLE_CAMPAIGNS: Campaign[] = [
   {
@@ -561,3 +562,9 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
     },
   },
 ];
+
+SAMPLE_CAMPAIGNS.forEach((c) => {
+  if (!c.presentation) {
+    c.presentation = generateDeterministicPresentationDeck(c);
+  }
+});

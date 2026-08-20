@@ -37,6 +37,16 @@ export const critiqueRequestSchema = z.object({
   modelId: boundedText(160).optional(),
 }).strict();
 
+export const presentationRequestSchema = z.object({
+  campaign: jsonObject,
+  brandKit: jsonObject.default({}),
+  organizationId: uuid,
+  campaignId: uuid,
+  modelId: boundedText(160).optional(),
+  thinkingLevel: z.enum(['low', 'medium', 'high']).default('medium'),
+  idempotencyKey: boundedText(128).optional(),
+}).strict();
+
 export const imageRequestSchema = z.object({
   brief: z.object({
     purpose: z.enum(['hero', 'supporting', 'background', 'editorial', 'renovation_concept', 'neighborhood_lifestyle']).optional(),

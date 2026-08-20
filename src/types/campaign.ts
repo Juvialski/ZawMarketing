@@ -87,6 +87,7 @@ export interface CampaignImage {
 }
 
 import { GenerationMetadata } from './providers';
+import { PresentationDeck } from './presentation';
 
 export interface CampaignStrategy {
   targetAudience: {
@@ -218,6 +219,7 @@ export interface Campaign {
   sourceData: CampaignSourceData;
   strategy?: CampaignStrategy;
   copy?: CampaignCopy;
+  presentation?: PresentationDeck;
   designConfigs: Record<OutputAspectRatio, GraphicDesignConfig>;
   brandKitId?: string;
   tags: string[];

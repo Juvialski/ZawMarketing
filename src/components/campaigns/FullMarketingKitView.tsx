@@ -15,7 +15,8 @@ import {
   Check,
   AlertCircle,
   Award,
-  Cpu
+  Cpu,
+  Presentation
 } from 'lucide-react';
 
 interface FullMarketingKitViewProps {
@@ -244,7 +245,7 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
       {isKitReady && (
         <div className="space-y-8">
           {/* Summary KPI Badges */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-subtle flex items-center gap-3">
               <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-700">
                 <Check className="w-5 h-5" />
@@ -282,6 +283,18 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
               <div>
                 <div className="text-[10px] font-mono text-slate-500 uppercase">Printable Flyer</div>
                 <div className="text-xs font-bold text-slate-900">US Letter & A4 PDF</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-subtle flex items-center gap-3">
+              <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-700">
+                <Presentation className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">Investment Deck</div>
+                <div className="text-xs font-bold text-slate-900">
+                  {campaign.presentation ? `${campaign.presentation.slides.length} Slides Ready` : 'Ready to Present'}
+                </div>
               </div>
             </div>
           </div>

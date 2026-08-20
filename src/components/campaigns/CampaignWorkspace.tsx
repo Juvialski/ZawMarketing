@@ -6,6 +6,7 @@ import { CopyWorkspace } from './CopyWorkspace';
 import { DesignEditor } from '../designs/DesignEditor';
 import { FullMarketingKitView } from './FullMarketingKitView';
 import { SourceIntakeForm } from './SourceIntakeForm';
+import { PresentationWorkspace } from '../../features/presentations/components/PresentationWorkspace';
 import { 
   Compass, 
   FileText, 
@@ -13,7 +14,8 @@ import {
   Package, 
   SlidersHorizontal,
   ArrowLeft,
-  MapPin
+  MapPin,
+  Presentation
 } from 'lucide-react';
 
 interface CampaignWorkspaceProps {
@@ -25,7 +27,7 @@ interface CampaignWorkspaceProps {
   onBack: () => void;
 }
 
-type WorkspaceTab = 'kit' | 'strategy' | 'copy' | 'designs' | 'intake';
+type WorkspaceTab = 'kit' | 'strategy' | 'copy' | 'designs' | 'presentation' | 'intake';
 
 export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
   campaign,
@@ -111,6 +113,7 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
             { id: 'strategy', label: 'Strategy', icon: Compass },
             { id: 'copy', label: 'Copy Studio', icon: FileText },
             { id: 'designs', label: 'Design & Flyers', icon: ImageIcon },
+            { id: 'presentation', label: 'Investment Deck', icon: Presentation },
             { id: 'intake', label: 'Property Data', icon: SlidersHorizontal },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -171,6 +174,16 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
             campaign={campaign}
             brandKit={brandKit}
             onSaveConfig={handleSaveDesignConfig}
+          />
+        )}
+
+        {activeTab === 'presentation' && (
+          <PresentationWorkspace
+            campaign={campaign}
+            brandKit={brandKit}
+            organizationId={organizationId}
+            runtimeMode={runtimeMode}
+            onUpdateCampaign={onUpdateCampaign}
           />
         )}
 

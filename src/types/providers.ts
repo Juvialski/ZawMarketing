@@ -2,8 +2,9 @@
  * AI and Image Provider Interface Definitions
  */
 
-import { CampaignSourceData, CampaignStrategy, CampaignCopy, CopyQualityReport } from './campaign';
+import { Campaign, CampaignSourceData, CampaignStrategy, CampaignCopy, CopyQualityReport } from './campaign';
 import { BrandKit } from './brandKit';
+import { PresentationDeck } from './presentation';
 
 export type AIProviderType = 'gemini' | 'mock' | 'auto';
 export type ImageProviderType = 'upload' | 'nvidia' | 'bfl' | 'gemini_image' | 'openai_image' | 'mock';
@@ -18,6 +19,7 @@ export type AIOperationType =
   | 'final_review'
   | 'copy_critique'
   | 'lead_summary'
+  | 'presentation_deck'
   | 'general_generation';
 
 export type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
@@ -235,6 +237,13 @@ export interface IAIProvider {
     brandKit: BrandKit,
     options?: GenerationOptions
   ): Promise<CopyQualityReport>;
+
+  generatePresentationDeck(
+    campaign: Campaign,
+    brandKit?: BrandKit,
+    onProgress?: GenerationProgressCallback,
+    options?: GenerationOptions
+  ): Promise<PresentationDeck>;
 }
 
 export interface GeneratedImageResult {

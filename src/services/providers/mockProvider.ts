@@ -1,7 +1,9 @@
 import { IAIProvider, GenerationProgressCallback, GenerationOptions, FullKitGenerationResult } from '../../types/providers';
-import { CampaignSourceData, CampaignStrategy, CampaignCopy, CopyQualityReport } from '../../types/campaign';
-import { BrandKit } from '../../types/brandKit';
+import { Campaign, CampaignSourceData, CampaignStrategy, CampaignCopy, CopyQualityReport } from '../../types/campaign';
+import { BrandKit, DEFAULT_BRAND_KIT } from '../../types/brandKit';
+import { PresentationDeck } from '../../types/presentation';
 import { AntiSlopCritic } from '../marketing/antiSlopCritic';
+import { generateDeterministicPresentationDeck } from '../../features/presentations/services/demoDeckGenerator';
 
 export class MockAIProvider implements IAIProvider {
   public id = 'mock-provider';
@@ -246,5 +248,24 @@ export class MockAIProvider implements IAIProvider {
     _options?: GenerationOptions
   ): Promise<CopyQualityReport> {
     return AntiSlopCritic.reviewCampaignCopy(copy, sourceData, brandKit);
+  }
+
+  public async generatePresentationDeck(
+    campaign: Campaign,
+    brandKit: BrandKit = DEFAULT_BRAND_KIT,
+    onProgress?: GenerationProgressCallback,
+    _options?: GenerationOptions
+  ): Promise<PresentationDeck> {
+    await this.simulateProgress(
+      [
+        { name: 'Extracting Campaign Facts & Financials', percent: 25, detail: 'Computing canonical valuation metrics...' },
+        { name: 'Designing Responsive Slide Layouts', percent: 50, detail: 'Mapping semantic structures to Brand Kit...' },
+        { name: 'Synthesizing Narrative & Speaker Notes', percent: 75, detail: 'Structuring investor thesis and market context...' },
+        { name: 'Validating Preflight Presentation Schema', percent: 100, detail: 'Verifying arithmetic facts and disclaimer compliance...' },
+      ],
+      onProgress
+    );
+
+    return generateDeterministicPresentationDeck(campaign, brandKit);
   }
 }

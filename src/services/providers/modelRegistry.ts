@@ -205,6 +205,12 @@ export class ModelRegistry {
           thinkingLevel: config?.thinkingLevels?.[operation] || 'medium',
         };
 
+      case 'presentation_deck':
+        return {
+          modelId: config?.defaultModelId || this.DEFAULT_TEXT_MODEL,
+          thinkingLevel: config?.thinkingLevels?.[operation] || 'medium',
+        };
+
       case 'campaign_kit':
       case 'campaign_draft':
       case 'platform_variants':

@@ -7,12 +7,15 @@ import {
   IAIProvider,
 } from '../../types/providers';
 import {
+  Campaign,
   CampaignCopy,
   CampaignSourceData,
   CampaignStrategy,
   CopyQualityReport,
 } from '../../types/campaign';
-import { BrandKit } from '../../types/brandKit';
+import { BrandKit, DEFAULT_BRAND_KIT } from '../../types/brandKit';
+import { PresentationDeck } from '../../types/presentation';
+import { presentationDeckSchema } from '../../features/presentations/schemas/presentationSchema';
 import { isSupabaseConfigured, supabase } from '../supabase/client';
 import { AntiSlopCritic } from '../marketing/antiSlopCritic';
 import { SettingsStore } from '../storage/settingsStore';
@@ -286,5 +289,41 @@ export class SupabaseFunctionsProvider implements IAIProvider {
       throw new BackendGenerationError('The secure review backend returned a malformed report.', 'malformed_structured_response');
     }
     return parsed.data as CopyQualityReport;
+  }
+
+  public async generatePresentationDeck(
+    campaign: Campaign,
+    brandKit: BrandKit = DEFAULT_BRAND_KIT,
+    onProgress?: GenerationProgressCallback,
+    options?: GenerationOptions
+  ): Promise<PresentationDeck> {
+    if (!this.isConfigured()) throw edgeError('Presentation deck generation');
+
+    const config = SettingsStore.get();
+    const resolved = ModelRegistry.resolveModelForOperation('presentation_deck', config);
+    const targetModel = options?.modelId || resolved.modelId;
+    const idempotencyKey = crypto.randomUUID();
+    onProgress?.('Generating structured presentation deck via secure backend...', 30);
+
+    const { data, error } = await supabase.functions.invoke('generate-presentation', {
+      body: {
+        campaign,
+        brandKit,
+        modelId: targetModel,
+        thinkingLevel: options?.thinkingLevel || resolved.thinkingLevel,
+        idempotencyKey,
+        ...getContext(options),
+      },
+    });
+    if (error || !data?.presentation) throw edgeError('Presentation deck generation');
+
+    onProgress?.('Validating presentation schema and semantic slide safety...', 85);
+    const parsed = presentationDeckSchema.safeParse(data.presentation);
+    if (!parsed.success) {
+      throw new BackendGenerationError('The secure AI backend returned a malformed presentation deck.', 'malformed_structured_response');
+    }
+
+    onProgress?.('Presentation deck ready.', 100);
+    return parsed.data as PresentationDeck;
   }
 }

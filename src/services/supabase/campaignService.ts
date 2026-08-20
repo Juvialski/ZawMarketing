@@ -7,6 +7,7 @@ import {
   GraphicDesignConfig,
   OutputAspectRatio,
 } from '../../types/campaign';
+import { PresentationDeck } from '../../types/presentation';
 import { CampaignStore } from '../storage/campaignStore';
 import { Database, Json } from '../../types/database.types';
 import { ServiceError } from './serviceError';
@@ -61,6 +62,9 @@ const mapRowToCampaign = (row: CampaignQueryRow): Campaign => {
   const copyContent = row.campaign_content?.find((content) => content.content_type === 'all_package');
   const copy = copyContent?.content as unknown as CampaignCopy | undefined;
 
+  const presentationContent = row.campaign_content?.find((content) => content.content_type === 'presentation_deck');
+  const presentation = presentationContent?.content as unknown as PresentationDeck | undefined;
+
   return {
     id: row.id,
     name: row.name,
@@ -70,6 +74,7 @@ const mapRowToCampaign = (row: CampaignQueryRow): Campaign => {
     sourceData: row.source_data as unknown as CampaignSourceData,
     strategy: row.strategy as unknown as CampaignStrategy | undefined,
     copy,
+    presentation,
     designConfigs: row.design_configs as unknown as Record<OutputAspectRatio, GraphicDesignConfig>,
     tags: row.tags || [],
   };
@@ -140,33 +145,61 @@ export class CampaignService {
   }
 
   private static async persistContent(organizationId: string, campaign: Campaign): Promise<void> {
-    if (!campaign.copy) return;
+    if (campaign.copy) {
+      const payload: CampaignContentInsert = {
+        campaign_id: campaign.id,
+        organization_id: organizationId,
+        content_type: 'all_package',
+        content: asJson(campaign.copy),
+        quality_report: campaign.copy.qualityReport ? asJson(campaign.copy.qualityReport) : null,
+        is_accepted: true,
+        version: 1,
+      };
+      const { data: existing, error: lookupError } = await supabase
+        .from('campaign_content')
+        .select('id')
+        .eq('campaign_id', campaign.id)
+        .eq('content_type', 'all_package')
+        .eq('version', 1)
+        .maybeSingle();
+      if (lookupError) {
+        throw new ServiceError('write_failed', 'Campaign copy content could not be inspected before saving.', lookupError);
+      }
 
-    const payload: CampaignContentInsert = {
-      campaign_id: campaign.id,
-      organization_id: organizationId,
-      content_type: 'all_package',
-      content: asJson(campaign.copy),
-      quality_report: campaign.copy.qualityReport ? asJson(campaign.copy.qualityReport) : null,
-      is_accepted: true,
-      version: 1,
-    };
-    const { data: existing, error: lookupError } = await supabase
-      .from('campaign_content')
-      .select('id')
-      .eq('campaign_id', campaign.id)
-      .eq('content_type', 'all_package')
-      .eq('version', 1)
-      .maybeSingle();
-    if (lookupError) {
-      throw new ServiceError('write_failed', 'Campaign content could not be inspected before saving.', lookupError);
+      const write = existing
+        ? await supabase.from('campaign_content').update(payload).eq('id', existing.id)
+        : await supabase.from('campaign_content').insert(payload);
+      if (write.error) {
+        throw new ServiceError('write_failed', 'Campaign copy content could not be saved.', write.error);
+      }
     }
 
-    const write = existing
-      ? await supabase.from('campaign_content').update(payload).eq('id', existing.id)
-      : await supabase.from('campaign_content').insert(payload);
-    if (write.error) {
-      throw new ServiceError('write_failed', 'Campaign content could not be saved.', write.error);
+    if (campaign.presentation) {
+      const presPayload: CampaignContentInsert = {
+        campaign_id: campaign.id,
+        organization_id: organizationId,
+        content_type: 'presentation_deck',
+        content: asJson(campaign.presentation),
+        is_accepted: true,
+        version: 1,
+      };
+      const { data: existingPres, error: presLookupError } = await supabase
+        .from('campaign_content')
+        .select('id')
+        .eq('campaign_id', campaign.id)
+        .eq('content_type', 'presentation_deck')
+        .eq('version', 1)
+        .maybeSingle();
+      if (presLookupError) {
+        throw new ServiceError('write_failed', 'Campaign presentation content could not be inspected before saving.', presLookupError);
+      }
+
+      const writePres = existingPres
+        ? await supabase.from('campaign_content').update(presPayload).eq('id', existingPres.id)
+        : await supabase.from('campaign_content').insert(presPayload);
+      if (writePres.error) {
+        throw new ServiceError('write_failed', 'Campaign presentation content could not be saved.', writePres.error);
+      }
     }
   }
 
@@ -191,7 +224,11 @@ export class CampaignService {
       throw new ServiceError('write_failed', 'Campaign creation failed.', error);
     }
 
-    const saved = { ...mapRowToCampaign(data as unknown as CampaignQueryRow), copy: draft.copy };
+    const saved = {
+      ...mapRowToCampaign(data as unknown as CampaignQueryRow),
+      copy: draft.copy,
+      presentation: draft.presentation,
+    };
     await this.persistContent(organizationId, saved);
     return saved;
   }
@@ -216,7 +253,11 @@ export class CampaignService {
       throw new ServiceError(error ? 'write_failed' : 'not_found', 'Campaign update failed.', error);
     }
 
-    const saved = { ...mapRowToCampaign(data as unknown as CampaignQueryRow), copy: campaign.copy };
+    const saved = {
+      ...mapRowToCampaign(data as unknown as CampaignQueryRow),
+      copy: campaign.copy,
+      presentation: campaign.presentation,
+    };
     await this.persistContent(organizationId, saved);
     return saved;
   }
