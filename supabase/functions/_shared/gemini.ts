@@ -9,7 +9,11 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
-  } catch {
+  } catch (error: any) {
+    if (error?.name === 'AbortError' || controller.signal.aborted) {
+      throw new ProviderError('provider_timeout');
+    }
+    if (error instanceof ProviderError) throw error;
     throw new ProviderError('provider_unavailable');
   } finally {
     clearTimeout(timeout);
@@ -24,20 +28,29 @@ export async function generateGeminiJson(
 ): Promise<unknown> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new ProviderError('provider_not_configured');
-  const response = await fetchWithTimeout(`${GEMINI_API}/${encodeURIComponent(model)}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseJsonSchema,
-        thinkingConfig: { thinkingLevel },
-      },
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${GEMINI_API}/${encodeURIComponent(model)}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseJsonSchema,
+          thinkingConfig: { thinkingLevel },
+        },
+      }),
+    });
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw new ProviderError('provider_unavailable');
+  }
   if (!response.ok) {
-    console.warn('[edge] Gemini provider returned HTTP', response.status);
+    console.warn('[edge] Gemini provider returned HTTP', response.status, { model });
+    if (response.status === 401 || response.status === 403) throw new ProviderError('provider_auth_failed');
+    if (response.status === 404) throw new ProviderError('provider_model_unavailable');
+    if (response.status === 429) throw new ProviderError('provider_rate_limited');
     throw new ProviderError('provider_unavailable');
   }
   let payload: any;

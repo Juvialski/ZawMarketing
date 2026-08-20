@@ -31,7 +31,8 @@ serve(async (req) => {
       throw new AppError('provider_reference_unsupported', 400, 'Reference-image generation is not enabled for this server route.');
     }
     assertImageModel(body.provider, model);
-    const estimatedCost = configuredProviderCost(body.provider);
+    const isPaid = body.provider === 'bfl';
+    const estimatedCost = isPaid ? configuredProviderCost('bfl') : configuredProviderCost('nvidia');
     const claim = await claimGeneration(ctx.admin, {
       organizationId: body.organizationId,
       userId: ctx.user.id,
@@ -40,7 +41,7 @@ serve(async (req) => {
       provider: body.provider,
       model,
       idempotencyKey: requestKey,
-      isPaid: true,
+      isPaid,
       estimatedCostUsd: estimatedCost,
     });
     usageId = claim.usageId;
@@ -61,6 +62,7 @@ serve(async (req) => {
         provenance: 'generated',
         isAiIllustrative: true,
         isConceptual: true,
+        estimatedCostUsd: isPaid ? (image.actualCostUsd ?? estimatedCost) : 0,
       });
     } catch (error) {
       await finishGeneration(ctx.admin, usageId, 'failed', error instanceof ProviderError ? error.code : 'asset_persist_failed');

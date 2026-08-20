@@ -68,8 +68,9 @@ export const imageRequestSchema = z.object({
 }).strict();
 
 export const healthRequestSchema = z.object({
-  operation: z.literal('health').optional(),
+  operation: z.enum(['health', 'test_gemini', 'test_nvidia', 'test_all']).optional(),
   organizationId: uuid.optional(),
+  modelId: boundedText(160).optional(),
 }).strict();
 
 export async function parseBody<TSchema extends z.ZodTypeAny>(

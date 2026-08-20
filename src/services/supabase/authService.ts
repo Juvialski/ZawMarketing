@@ -17,7 +17,29 @@ export interface BackendHealthStatus {
     text?: { configured: boolean; models: string[] };
     images?: Record<string, { configured: boolean; models: string[] }>;
   };
+  text?: {
+    gemini?: { configured: boolean; models: string[] };
+  };
+  images?: {
+    nvidia?: { configured: boolean; models: string[]; tier?: string; estimatedCostUsd?: number };
+    bfl?: { configured: boolean; models: string[]; tier?: string };
+    gemini?: { configured: boolean; models: string[]; tier?: string; reason?: string };
+    openai?: { configured: boolean; models: string[]; tier?: string; reason?: string };
+  };
   paidGenerationEnabled?: boolean;
+}
+
+export interface ProviderSmokeTestResult {
+  ok: boolean;
+  operation: 'test_gemini' | 'test_nvidia';
+  provider: 'gemini' | 'nvidia';
+  model?: string;
+  usable?: boolean;
+  latencyMs?: number;
+  testedAt: string;
+  message?: string;
+  error?: string;
+  bytesReceived?: number;
 }
 
 interface ProfileRow {
@@ -155,6 +177,8 @@ export class AuthService {
     const response = typeof data === 'object' && data !== null ? data as {
       ok?: unknown;
       providers?: BackendHealthStatus['providers'];
+      text?: BackendHealthStatus['text'];
+      images?: BackendHealthStatus['images'];
       paidGenerationEnabled?: unknown;
     } : {};
     if (response.ok === false) {
@@ -165,7 +189,93 @@ export class AuthService {
       message: 'Authenticated backend is available.',
       checkedAt,
       providers: response.providers,
+      text: response.text,
+      images: response.images,
       paidGenerationEnabled: response.paidGenerationEnabled === true,
+    };
+  }
+
+  /**
+   * Performs an authenticated, deliberate smoke test for Gemini text or NVIDIA image generation.
+   */
+  public static async testProvider(
+    provider: 'gemini' | 'nvidia',
+    organizationId?: string,
+    modelId?: string
+  ): Promise<ProviderSmokeTestResult> {
+    const testedAt = new Date().toISOString();
+    const op = provider === 'gemini' ? 'test_gemini' : 'test_nvidia';
+
+    if (!isSupabaseConfigured()) {
+      return {
+        ok: false,
+        operation: op,
+        provider,
+        testedAt,
+        error: 'not_configured',
+        message: 'Backend is not configured. Live smoke tests require a live backend.',
+      };
+    }
+
+    const user = await this.getUser();
+    if (!user) {
+      return {
+        ok: false,
+        operation: op,
+        provider,
+        testedAt,
+        error: 'unauthenticated',
+        message: 'Sign in to run authenticated provider smoke tests.',
+      };
+    }
+
+    const { data, error } = await supabase.functions.invoke('health', {
+      body: {
+        operation: op,
+        ...(organizationId ? { organizationId } : {}),
+        ...(modelId ? { modelId } : {}),
+      },
+    });
+
+    if (error) {
+      let code = 'provider_unavailable';
+      let message = 'Provider smoke test failed.';
+      if (error && typeof error === 'object' && (error as any).context && typeof (error as any).context.json === 'function') {
+        try {
+          const body = await (error as any).context.json();
+          if (body && typeof body === 'object') {
+            code = typeof body.error === 'string' ? body.error : code;
+            message = typeof body.message === 'string' ? body.message : message;
+          }
+        } catch {
+          // ignore
+        }
+      } else if (error.message) {
+        message = error.message;
+      }
+      return {
+        ok: false,
+        operation: op,
+        provider,
+        testedAt,
+        error: code,
+        message,
+      };
+    }
+
+    const res = data as any;
+    return {
+      ok: res?.ok === true,
+      operation: op,
+      provider,
+      model: res?.model,
+      usable: res?.usable ?? true,
+      latencyMs: res?.latencyMs,
+      bytesReceived: res?.bytesReceived,
+      testedAt: res?.testedAt || testedAt,
+      message: res?.ok
+        ? `${provider === 'gemini' ? 'Gemini Text' : 'NVIDIA NIM Image'} verified in ${res?.latencyMs ?? 0}ms (${res?.model || 'default model'})`
+        : 'Provider smoke test failed.',
     };
   }
 }

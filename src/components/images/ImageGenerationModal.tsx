@@ -11,7 +11,6 @@ import { SettingsStore } from '../../services/storage/settingsStore';
 import { ImageProviderRegistry } from '../../services/providers/imageProviderRegistry';
 import { ImageSpendingTracker } from '../../services/providers/imageSpendingTracker';
 import { ImageProviderRouter } from '../../services/providers/imageProvider';
-import { isSupabaseConfigured } from '../../services/supabase/client';
 import { 
   Sparkles, 
   X, 
@@ -32,6 +31,8 @@ interface ImageGenerationModalProps {
   propertyType?: string;
   uploadedImages?: CampaignImage[];
   campaignId?: string;
+  organizationId?: string;
+  runtimeMode?: 'demo' | 'live';
 }
 
 export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
@@ -44,6 +45,8 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   propertyType = 'single_family',
   uploadedImages = [],
   campaignId,
+  organizationId,
+  runtimeMode = 'demo',
 }) => {
   const config = SettingsStore.get();
   const spendingLimits = config.imageSpendingLimits;
@@ -51,7 +54,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   const [purpose, setPurpose] = useState<ImagePurpose>('hero');
   const [style, setStyle] = useState<ImageStyle>('architectural_photography');
   const [qualityTier, setQualityTier] = useState<ImageQualityTier>(
-    spendingLimits.enablePaidGeneration ? 'paid_maximum' : 'free_dev'
+    spendingLimits.enablePaidGeneration && runtimeMode === 'live' ? 'paid_maximum' : 'free_dev'
   );
   const [aspectRatio, setAspectRatio] = useState<'1:1' | '4:5' | '16:9' | '9:16'>('1:1');
   const [customSubject, setCustomSubject] = useState('');
@@ -65,18 +68,24 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   // Resolve estimated cost
   const isPaidTier = qualityTier !== 'free_dev';
   const estimatedCost = ImageProviderRegistry.getCostEstimate(qualityTier);
-  const isPaidAllowed = spendingLimits.enablePaidGeneration;
+  const isPaidAllowed = spendingLimits.enablePaidGeneration && runtimeMode === 'live';
 
   const handleGenerate = async () => {
     setErrorMsg(null);
 
-    if (isSupabaseConfigured() && !campaignId) {
-      setErrorMsg('Save the campaign before requesting live image generation so the asset can be stored securely.');
-      return;
+    if (runtimeMode === 'live') {
+      if (!campaignId || campaignId === 'drafts') {
+        setErrorMsg('Save the campaign before requesting live image generation so the asset can be stored securely.');
+        return;
+      }
+      if (!organizationId) {
+        setErrorMsg('An organization workspace is required for live image generation.');
+        return;
+      }
     }
 
     // Enforce cost safety
-    if (isPaidTier) {
+    if (isPaidTier && runtimeMode === 'live') {
       const budgetCheck = ImageSpendingTracker.canExecutePaidGeneration(
         estimatedCost,
         spendingLimits,
@@ -103,13 +112,13 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
         isConceptual: true,
       };
 
-      const resolved = ImageProviderRegistry.resolveProviderForBrief(brief, config);
+      const resolved = ImageProviderRegistry.resolveProviderForBrief(brief, config, runtimeMode);
       setProgressMsg(`Generating via ${resolved.providerId.toUpperCase()} (${resolved.modelId})...`);
 
       const adapter = ImageProviderRouter.getAdapterForConfig({
         ...config,
         imageQualityTier: qualityTier,
-      }, { campaignId });
+      }, { campaignId, organizationId, runtimeMode });
 
       const result = await adapter.generateFromBrief(brief, (step) => setProgressMsg(step));
 
@@ -201,10 +210,10 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 {
                   id: 'free_dev',
                   label: 'Free / Prototype',
-                  provider: 'Authentic Upload / Bundled Demo Fixture',
+                  provider: runtimeMode === 'demo' ? 'Bundled Fictional Demo Fixture' : 'NVIDIA NIM (Free Dev Tier)',
                   cost: 'Free ($0.00)',
-                  badge: 'FREE',
-                  badgeColor: 'bg-slate-100 text-slate-700',
+                  badge: runtimeMode === 'demo' ? 'DEMO' : 'FREE',
+                  badgeColor: runtimeMode === 'demo' ? 'bg-slate-100 text-slate-700' : 'bg-emerald-50 text-emerald-700 border border-emerald-200',
                 },
                 {
                   id: 'paid_standard',
@@ -227,11 +236,11 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 {
                   id: 'paid_alternate',
                   label: 'Multimodal Grounding',
-                  provider: 'Gemini 3.1 Flash Image (server verification required)',
-                  cost: 'Server estimate required',
-                  badge: 'GEMINI',
-                  badgeColor: 'bg-blue-50 text-blue-700 border border-blue-200',
-                  disabled: !isPaidAllowed,
+                  provider: 'Gemini Image (Not enabled on this deployment)',
+                  cost: 'Unavailable',
+                  badge: 'DISABLED',
+                  badgeColor: 'bg-slate-100 text-slate-400',
+                  disabled: true,
                 },
               ].map((tier) => (
                 <button
@@ -377,8 +386,10 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               <span className="font-mono text-slate-700 font-semibold">
                 Est. Cost: ~${estimatedCost.toFixed(2)} · {qualityTier.replace('_', ' ').toUpperCase()}
               </span>
+            ) : runtimeMode === 'demo' ? (
+              <span className="text-slate-600 font-medium">Bundled Fictional Demo Fixture ($0.00)</span>
             ) : (
-              <span className="text-slate-600 font-medium">Free Development Tier (NVIDIA NIM)</span>
+              <span className="text-slate-600 font-medium">Free Development Tier (NVIDIA NIM · $0.00)</span>
             )}
           </div>
 

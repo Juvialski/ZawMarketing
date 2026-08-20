@@ -59,9 +59,9 @@ export const IMAGE_PROVIDER_DEFINITIONS: Record<ImageProviderType, ImageProvider
     supportsBrandColorControl: false,
     supportsGrounding: false,
     estimatedCostPerImageUsd: 0,
-    active: false,
-    configured: false,
-    description: 'Server adapter remains disabled until the deployed account model catalog is smoke-tested.',
+    active: true,
+    configured: true,
+    description: 'Free development visual concept generation via server-side NVIDIA NIM.',
   },
   bfl: {
     providerId: 'bfl',
@@ -98,7 +98,7 @@ export const IMAGE_PROVIDER_DEFINITIONS: Record<ImageProviderType, ImageProvider
     estimatedCostPerImageUsd: 0,
     active: false,
     configured: false,
-    description: 'Current official Gemini image IDs; disabled until the server project confirms model access and pricing.',
+    description: 'Google Gemini native image generation is not enabled on this deployment.',
   },
   openai_image: {
     providerId: 'openai_image',
@@ -262,15 +262,25 @@ export class ImageProviderRegistry {
 
   public static resolveProviderForBrief(
     brief: ImageCreativeBrief,
-    config: ProviderConfig
+    config: ProviderConfig,
+    runtimeMode: 'demo' | 'live' = 'live'
   ): { providerId: ImageProviderType; modelId: string; isPaid: boolean; estimatedCostUsd: number } {
     const requestedTier = brief.qualityTier || config.imageQualityTier || 'free_dev';
     const paidEnabled = config.imageSpendingLimits?.enablePaidGeneration === true;
 
+    if (runtimeMode === 'demo') {
+      return {
+        providerId: 'mock',
+        modelId: 'bundled-fictional-fixture',
+        isPaid: false,
+        estimatedCostUsd: 0,
+      };
+    }
+
     if (requestedTier === 'free_dev' || !paidEnabled) {
       return {
-        providerId: 'upload',
-        modelId: 'authentic-real-upload',
+        providerId: 'nvidia',
+        modelId: config.nvidiaModelId || 'stabilityai/stable-diffusion-3.5-large',
         isPaid: false,
         estimatedCostUsd: 0,
       };
@@ -283,10 +293,11 @@ export class ImageProviderRegistry {
       return { providerId: 'bfl', modelId: 'flux-2-flex', isPaid: true, estimatedCostUsd: 0.05 };
     }
     if (requestedTier === 'paid_alternate') {
+      // Gemini image is not enabled on this deployment; fallback safely to free NVIDIA tier
       return {
-        providerId: 'gemini_image',
-        modelId: 'gemini-3.1-flash-image',
-        isPaid: true,
+        providerId: 'nvidia',
+        modelId: config.nvidiaModelId || 'stabilityai/stable-diffusion-3.5-large',
+        isPaid: false,
         estimatedCostUsd: 0,
       };
     }

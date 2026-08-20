@@ -538,6 +538,8 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
         propertyType={campaignType}
         uploadedImages={uploadedImages}
         campaignId={campaignId}
+        organizationId={organizationId}
+        runtimeMode={runtimeMode}
       />
     </form>
   );

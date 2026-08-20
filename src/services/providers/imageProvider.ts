@@ -67,9 +67,55 @@ export class UploadOnlyProvider implements IImageProvider {
   }
 }
 
-interface EdgeImageContext {
+export interface EdgeImageContext {
   campaignId?: string;
   organizationId?: string;
+  runtimeMode?: 'demo' | 'live';
+}
+
+export async function extractEdgeErrorMessage(error: any): Promise<{ code: string; message: string }> {
+  if (error && typeof error === 'object') {
+    if (error.context && typeof error.context.json === 'function') {
+      try {
+        const body = await error.context.json();
+        if (body && typeof body === 'object') {
+          const code = typeof body.error === 'string' ? body.error : 'provider_error';
+          const message = typeof body.message === 'string' ? body.message : getHumanMessageForCode(code);
+          return { code, message };
+        }
+      } catch {
+        // Fall through
+      }
+    }
+    if (error.message) {
+      return { code: 'provider_error', message: error.message };
+    }
+  }
+  return { code: 'provider_unavailable', message: 'Image generation backend is temporarily unavailable.' };
+}
+
+function getHumanMessageForCode(code: string): string {
+  const messages: Record<string, string> = {
+    unauthorized: 'Authentication is required. Please sign in.',
+    organization_access_denied: 'You do not have access to this organization workspace.',
+    campaign_access_denied: 'You do not have access to this campaign or it has not been saved.',
+    provider_not_configured: 'The selected image provider (NVIDIA NIM) is not configured in backend secrets.',
+    provider_pricing_unconfigured: 'Provider pricing is not configured on the server.',
+    provider_disabled: 'This image provider is not enabled on the server.',
+    model_not_allowed: 'The requested AI model is not in the server allowlist.',
+    paid_generation_disabled: 'Paid generation is disabled by workspace settings or server policy.',
+    provider_rate_limited: 'AI provider rate limit reached. Please try again shortly.',
+    provider_auth_failed: 'Provider authentication failed with NVIDIA/AI API. Verify API key in Edge secrets.',
+    provider_access_denied: 'Provider access denied for this model or account.',
+    provider_model_unavailable: 'The requested AI model is unavailable or not found on the provider.',
+    provider_unavailable: 'AI provider service is temporarily unavailable.',
+    provider_timeout: 'AI provider request timed out. Please try again.',
+    asset_persist_failed: 'Failed to save generated image to workspace storage.',
+    asset_url_failed: 'Failed to create access URL for generated image.',
+    invalid_request: 'The image generation request was invalid.',
+    server_control_unavailable: 'Generation controls are temporarily unavailable.',
+  };
+  return messages[code] ?? 'The image generation backend could not complete this request.';
 }
 
 interface EdgeImageResponse {
@@ -132,7 +178,11 @@ export class SupabaseEdgeImageProvider implements IImageProvider {
       throw new Error('Live image generation requires the authenticated backend.');
     }
 
-    const resolved = ImageProviderRegistry.resolveProviderForBrief(brief, this.config);
+    const resolved = ImageProviderRegistry.resolveProviderForBrief(
+      brief,
+      this.config,
+      this.context.runtimeMode ?? 'live'
+    );
     onProgress?.('Requesting secure server-side image generation...', 35);
 
     const { data, error } = await supabase.functions.invoke<EdgeImageResponse>('generate-image', {
@@ -147,7 +197,8 @@ export class SupabaseEdgeImageProvider implements IImageProvider {
     });
 
     if (error) {
-      throw new Error('Image generation backend is unavailable. No paid fallback was attempted.');
+      const safeError = await extractEdgeErrorMessage(error);
+      throw new Error(safeError.message);
     }
 
     const url = data?.asset?.accessUrl || data?.asset?.signedUrl || data?.signedUrl || data?.url;
@@ -191,6 +242,11 @@ export class ImageProviderRouter {
     config: ProviderConfig,
     context: EdgeImageContext = {}
   ): IImageProvider {
+    const runtimeMode = context.runtimeMode ?? config.runtimeMode ?? 'live';
+    if (runtimeMode === 'demo') {
+      return new UploadOnlyProvider();
+    }
+
     if (isSupabaseConfigured()) {
       return new SupabaseEdgeImageProvider(config, context);
     }

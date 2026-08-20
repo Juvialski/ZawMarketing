@@ -28,7 +28,11 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
-  } catch {
+  } catch (error: any) {
+    if (error?.name === 'AbortError' || controller.signal.aborted) {
+      throw new ProviderError('provider_timeout');
+    }
+    if (error instanceof ProviderError) throw error;
     throw new ProviderError('provider_unavailable');
   } finally {
     clearTimeout(timeout);
@@ -43,7 +47,11 @@ function contentTypeFrom(value: string | null | undefined): GeneratedImage['cont
 }
 
 async function responseToImage(response: Response): Promise<{ bytes: Uint8Array; contentType: GeneratedImage['contentType'] }> {
-  if (!response.ok) throw new ProviderError('provider_unavailable');
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) throw new ProviderError('provider_auth_failed');
+    if (response.status === 429) throw new ProviderError('provider_rate_limited');
+    throw new ProviderError('provider_unavailable');
+  }
   const contentLength = Number(response.headers.get('content-length') ?? 0);
   if (contentLength > MAX_IMAGE_BYTES) throw new ProviderError('provider_output_too_large');
   const bytes = new Uint8Array(await response.arrayBuffer());
@@ -78,7 +86,13 @@ function imageValue(value: unknown): Promise<{ bytes: Uint8Array; contentType: G
 }
 
 export function configuredProviderCost(provider: 'bfl' | 'nvidia'): number {
-  const name = provider === 'bfl' ? 'BFL_ESTIMATED_COST_USD' : 'NVIDIA_ESTIMATED_COST_USD';
+  if (provider === 'nvidia') {
+    const raw = Deno.env.get('NVIDIA_ESTIMATED_COST_USD');
+    if (!raw) return 0;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  }
+  const name = 'BFL_ESTIMATED_COST_USD';
   const parsed = Number(Deno.env.get(name));
   if (!Number.isFinite(parsed) || parsed < 0) throw new ProviderError('provider_pricing_unconfigured');
   return parsed;
@@ -92,13 +106,22 @@ export async function generateBflImage(
   const apiKey = Deno.env.get('BFL_API_KEY');
   if (!apiKey) throw new ProviderError('provider_not_configured');
   const { width, height } = sizeForRatio(aspectRatio);
-  const submit = await fetchWithTimeout(`${BFL_API}/${encodeURIComponent(model)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-key': apiKey },
-    body: JSON.stringify({ prompt: subject, width, height }),
-  });
+  let submit: Response;
+  try {
+    submit = await fetchWithTimeout(`${BFL_API}/${encodeURIComponent(model)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-key': apiKey },
+      body: JSON.stringify({ prompt: subject, width, height }),
+    });
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw new ProviderError('provider_unavailable');
+  }
   if (!submit.ok) {
-    console.warn('[edge] BFL submit returned HTTP', submit.status);
+    console.warn('[edge] BFL submit returned HTTP', submit.status, { model });
+    if (submit.status === 401 || submit.status === 403) throw new ProviderError('provider_auth_failed');
+    if (submit.status === 404) throw new ProviderError('provider_model_unavailable');
+    if (submit.status === 429) throw new ProviderError('provider_rate_limited');
     throw new ProviderError('provider_unavailable');
   }
   let submitted: any;
@@ -149,13 +172,22 @@ export async function generateNvidiaImage(
   const apiKey = Deno.env.get('NVIDIA_API_KEY');
   if (!apiKey) throw new ProviderError('provider_not_configured');
   const { width, height } = sizeForRatio(aspectRatio);
-  const response = await fetchWithTimeout(NVIDIA_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, prompt: subject, size: `${width}x${height}`, n: 1 }),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(NVIDIA_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, prompt: subject, size: `${width}x${height}`, n: 1 }),
+    });
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw new ProviderError('provider_unavailable');
+  }
   if (!response.ok) {
-    console.warn('[edge] NVIDIA image provider returned HTTP', response.status);
+    console.warn('[edge] NVIDIA image provider returned HTTP', response.status, { model });
+    if (response.status === 401 || response.status === 403) throw new ProviderError('provider_auth_failed');
+    if (response.status === 404) throw new ProviderError('provider_model_unavailable');
+    if (response.status === 429) throw new ProviderError('provider_rate_limited');
     throw new ProviderError('provider_unavailable');
   }
   let payload: any;
@@ -164,11 +196,30 @@ export async function generateNvidiaImage(
   } catch {
     throw new ProviderError('provider_invalid_output');
   }
-  const value = payload?.data?.[0]?.b64_json
-    ? `data:image/png;base64,${payload.data[0].b64_json}`
-    : payload?.data?.[0]?.url;
-  const image = await imageValue(value);
-  return { ...image, providerRequestId: typeof payload?.id === 'string' ? payload.id : undefined };
+
+  let rawValue: string | undefined;
+  if (typeof payload?.data?.[0]?.b64_json === 'string') {
+    const raw = payload.data[0].b64_json;
+    rawValue = raw.startsWith('data:') ? raw : `data:image/png;base64,${raw}`;
+  } else if (typeof payload?.data?.[0]?.url === 'string') {
+    rawValue = payload.data[0].url;
+  } else if (typeof payload?.artifacts?.[0]?.base64 === 'string') {
+    rawValue = `data:image/png;base64,${payload.artifacts[0].base64}`;
+  } else if (typeof payload?.image === 'string') {
+    const raw = payload.image;
+    rawValue = raw.startsWith('data:') || raw.startsWith('http') ? raw : `data:image/png;base64,${raw}`;
+  } else if (typeof payload?.b64_json === 'string') {
+    const raw = payload.b64_json;
+    rawValue = raw.startsWith('data:') ? raw : `data:image/png;base64,${raw}`;
+  }
+
+  if (!rawValue) {
+    console.warn('[edge] NVIDIA returned unexpected response structure', { model, hasData: Boolean(payload?.data) });
+    throw new ProviderError('provider_invalid_output');
+  }
+
+  const image = await imageValue(rawValue);
+  return { ...image, providerRequestId: typeof payload?.id === 'string' ? payload.id : undefined, actualCostUsd: 0 };
 }
 
 export async function persistGeneratedImage(

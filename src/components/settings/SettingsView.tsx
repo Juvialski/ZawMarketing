@@ -4,8 +4,8 @@ import { SettingsStore } from '../../services/storage/settingsStore';
 import { GEMINI_TEXT_MODELS } from '../../services/providers/modelRegistry';
 import { UsageTracker, ModelQuotaSummary } from '../../services/providers/usageTracker';
 import { ImageSpendingTracker, SpendingSummary } from '../../services/providers/imageSpendingTracker';
-import { AuthService, BackendHealthStatus } from '../../services/supabase/authService';
-import { Activity, AlertTriangle, Check, Cpu, DollarSign, RotateCcw, ShieldCheck, Sliders, Zap } from 'lucide-react';
+import { AuthService, BackendHealthStatus, ProviderSmokeTestResult } from '../../services/supabase/authService';
+import { Activity, AlertTriangle, Check, Cpu, DollarSign, RotateCcw, ShieldCheck, Sliders, Zap, RefreshCw, Sparkles } from 'lucide-react';
 
 const OPERATIONS: Array<{
   op: AIOperationType;
@@ -40,6 +40,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ organizationId }) =>
   );
   const [healthStatus, setHealthStatus] = useState<BackendHealthStatus | null>(null);
   const [healthChecking, setHealthChecking] = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<ProviderSmokeTestResult | null>(null);
+  const [nvidiaTestResult, setNvidiaTestResult] = useState<ProviderSmokeTestResult | null>(null);
+  const [testingGemini, setTestingGemini] = useState(false);
+  const [testingNvidia, setTestingNvidia] = useState(false);
 
   const textModels = useMemo(() => Object.values(GEMINI_TEXT_MODELS), []);
   const isPaidImageEnabled = config.imageSpendingLimits?.enablePaidGeneration ?? false;
@@ -99,6 +103,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ organizationId }) =>
     }
   }
 
+  async function handleTestGemini() {
+    setTestingGemini(true);
+    try {
+      const result = await AuthService.testProvider('gemini', organizationId, config.defaultModelId);
+      setGeminiTestResult(result);
+    } catch (err: any) {
+      setGeminiTestResult({
+        ok: false,
+        operation: 'test_gemini',
+        provider: 'gemini',
+        testedAt: new Date().toISOString(),
+        error: 'test_failed',
+        message: err.message || 'Gemini smoke test failed.',
+      });
+    } finally {
+      setTestingGemini(false);
+    }
+  }
+
+  async function handleTestNvidia() {
+    setTestingNvidia(true);
+    try {
+      const result = await AuthService.testProvider('nvidia', organizationId, config.nvidiaModelId);
+      setNvidiaTestResult(result);
+    } catch (err: any) {
+      setNvidiaTestResult({
+        ok: false,
+        operation: 'test_nvidia',
+        provider: 'nvidia',
+        testedAt: new Date().toISOString(),
+        error: 'test_failed',
+        message: err.message || 'NVIDIA smoke test failed.',
+      });
+    } finally {
+      setTestingNvidia(false);
+    }
+  }
+
+  async function handleTestAll() {
+    await Promise.all([handleTestGemini(), handleTestNvidia()]);
+  }
+
   const handleResetDefaults = () => {
     if (!window.confirm('Reset client-safe preferences to defaults?')) return;
     SettingsStore.clear();
@@ -143,7 +189,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ organizationId }) =>
               Backend Connection & Provider Status
             </h3>
             <p className="text-[11px] text-slate-500 mt-1">
-              This browser never receives provider API keys. A health check uses the authenticated backend operation.
+              This browser never receives provider API keys. A health check and explicit smoke tests use the authenticated backend operation.
             </p>
           </div>
           <span className="text-[10px] font-mono uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
@@ -162,30 +208,125 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ organizationId }) =>
               <span className="text-slate-500">Checking authenticated backend status…</span>
             )}
           </div>
-          <button
-            onClick={() => void checkBackendHealth()}
-            disabled={healthChecking}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            {healthChecking ? 'Checking…' : 'Check Backend'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void checkBackendHealth()}
+              disabled={healthChecking}
+              className="px-3.5 py-2 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>{healthChecking ? 'Checking…' : 'Check Health'}</span>
+            </button>
+            <button
+              onClick={() => void handleTestGemini()}
+              disabled={testingGemini}
+              className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {testingGemini ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-blue-600" />}
+              <span>Test Gemini</span>
+            </button>
+            <button
+              onClick={() => void handleTestNvidia()}
+              disabled={testingNvidia}
+              className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {testingNvidia ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-emerald-600" />}
+              <span>Test NVIDIA</span>
+            </button>
+            <button
+              onClick={() => void handleTestAll()}
+              disabled={testingGemini || testingNvidia}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span>Test AI Providers</span>
+            </button>
+          </div>
         </div>
+
+        {/* Smoke Test Feedback Banners */}
+        {(geminiTestResult || nvidiaTestResult) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {geminiTestResult && (
+              <div className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
+                geminiTestResult.ok
+                  ? 'bg-blue-50/80 border-blue-200 text-blue-900'
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}>
+                {geminiTestResult.ok ? <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />}
+                <div>
+                  <div className="font-bold">Gemini Text Smoke Test: {geminiTestResult.ok ? 'PASSED' : 'FAILED'}</div>
+                  <div className="text-[11px] mt-0.5">{geminiTestResult.message}</div>
+                </div>
+              </div>
+            )}
+            {nvidiaTestResult && (
+              <div className={`p-3 rounded-xl border text-xs flex items-start gap-2 ${
+                nvidiaTestResult.ok
+                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}>
+                {nvidiaTestResult.ok ? <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />}
+                <div>
+                  <div className="font-bold">NVIDIA NIM Image Smoke Test: {nvidiaTestResult.ok ? 'PASSED' : 'FAILED'}</div>
+                  <div className="text-[11px] mt-0.5">{nvidiaTestResult.message}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           {[
-            ['Gemini text', healthStatus?.providers?.text?.configured ? 'Server configured' : 'Not configured', healthStatus?.providers?.text?.configured === true],
-            ['NVIDIA image', healthStatus?.providers?.images?.nvidia?.configured ? 'Server configured' : 'Not configured', healthStatus?.providers?.images?.nvidia?.configured === true],
-            ['BFL image', healthStatus?.providers?.images?.bfl?.configured ? 'Server configured' : 'Not configured', healthStatus?.providers?.images?.bfl?.configured === true],
-            ['Gemini image', 'Disabled pending verification', false],
-            ['Paid generation', healthStatus?.paidGenerationEnabled ? 'Enabled by server policy' : 'Disabled by server policy', healthStatus?.paidGenerationEnabled === true],
-            ['Private provider keys', 'Never exposed to browser', true],
-          ].map(([label, value, configured]) => (
+            [
+              'Gemini text',
+              healthStatus?.providers?.text?.configured ? 'Server configured' : 'Not configured',
+              healthStatus?.providers?.text?.configured === true,
+              geminiTestResult ? (geminiTestResult.ok ? `Verified (${geminiTestResult.latencyMs}ms)` : 'Test failed') : undefined
+            ],
+            [
+              'NVIDIA image (Free Dev)',
+              healthStatus?.providers?.images?.nvidia?.configured ? 'Server configured ($0)' : 'Not configured',
+              healthStatus?.providers?.images?.nvidia?.configured === true,
+              nvidiaTestResult ? (nvidiaTestResult.ok ? `Verified (${nvidiaTestResult.latencyMs}ms)` : 'Test failed') : undefined
+            ],
+            [
+              'BFL image (Paid)',
+              healthStatus?.providers?.images?.bfl?.configured ? 'Server configured' : 'Not configured',
+              healthStatus?.providers?.images?.bfl?.configured === true,
+              undefined
+            ],
+            [
+              'Gemini image',
+              'Not enabled on this deployment',
+              false,
+              undefined
+            ],
+            [
+              'Paid generation policy',
+              healthStatus?.paidGenerationEnabled ? 'Enabled by server policy' : 'Disabled by server policy',
+              healthStatus?.paidGenerationEnabled === true,
+              undefined
+            ],
+            [
+              'Private provider keys',
+              'Never exposed to browser',
+              true,
+              undefined
+            ],
+          ].map(([label, value, configured, testInfo]) => (
             <div key={label as string} className="p-3 rounded-xl border border-slate-200 bg-slate-50/70">
               <div className="text-[10px] uppercase tracking-wider font-mono text-slate-500">{label}</div>
-              <div className="mt-1 font-semibold text-slate-800 flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${configured ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                {value}
+              <div className="mt-1 font-semibold text-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${configured ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                  <span>{value}</span>
+                </div>
+                {testInfo && (
+                  <span className="text-[10px] font-mono text-slate-500 font-normal">
+                    {testInfo}
+                  </span>
+                )}
               </div>
             </div>
           ))}

@@ -72,10 +72,17 @@ describe('Image Provider Registry, Quality Tiers & Creative Brief Composer', () 
       qualityTier: 'paid_maximum',
     };
 
-    const resolved = ImageProviderRegistry.resolveProviderForBrief(brief, config);
-    expect(resolved.isPaid).toBe(false);
-    expect(resolved.estimatedCostUsd).toBe(0.0);
-    expect(resolved.providerId).toBe('upload');
+    const resolvedLive = ImageProviderRegistry.resolveProviderForBrief(brief, config, 'live');
+    expect(resolvedLive.isPaid).toBe(false);
+    expect(resolvedLive.estimatedCostUsd).toBe(0.0);
+    expect(resolvedLive.providerId).toBe('nvidia');
+    expect(resolvedLive.modelId).toBe('stabilityai/stable-diffusion-3.5-large');
+
+    const resolvedDemo = ImageProviderRegistry.resolveProviderForBrief(brief, config, 'demo');
+    expect(resolvedDemo.isPaid).toBe(false);
+    expect(resolvedDemo.estimatedCostUsd).toBe(0.0);
+    expect(resolvedDemo.providerId).toBe('mock');
+    expect(resolvedDemo.modelId).toBe('bundled-fictional-fixture');
   });
 
   it('should resolve FLUX.2 Max for hero and FLUX.2 Pro for supporting in auto mode when paid is enabled', () => {
