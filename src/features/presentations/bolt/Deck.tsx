@@ -76,6 +76,7 @@ export interface DeckProps {
   className?: string;
   style?: React.CSSProperties;
   onNotesChange?: (slideIndex: number, notes: string) => void;
+  readOnly?: boolean;
 }
 
 export default function Deck({
@@ -84,6 +85,7 @@ export default function Deck({
   className = '',
   style,
   onNotesChange,
+  readOnly = false,
 }: DeckProps) {
   const slides = useMemo(
     () => Children.toArray(children) as ReactElement[],
@@ -192,6 +194,7 @@ export default function Deck({
 
   const setNote = useCallback(
     (text: string) => {
+      if (readOnly) return;
       setNoteOverrides((prevNotes) => {
         const nextO = { ...prevNotes, [slideRef.current]: text };
         try {
@@ -203,7 +206,7 @@ export default function Deck({
       });
       onNotesChange?.(slideRef.current, text);
     },
-    [notesStorageKey, onNotesChange]
+    [readOnly, notesStorageKey, onNotesChange]
   );
 
   const openPresenter = useCallback(() => {
@@ -265,11 +268,11 @@ export default function Deck({
           break;
         case 'a':
         case 'A':
-          setDrawing((v) => !v);
+          if (!readOnly) setDrawing((v) => !v);
           break;
         case 'p':
         case 'P':
-          openPresenter();
+          if (!readOnly) openPresenter();
           break;
         case 'h':
         case 'H':
@@ -330,7 +333,7 @@ export default function Deck({
   const applyingRemote = useRef(false);
 
   useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') return;
+    if (readOnly || typeof BroadcastChannel === 'undefined') return;
     const channelName = `zaw-deck-sync:${campaignId}`;
     const c = new BroadcastChannel(channelName);
     chan.current = c;
@@ -342,15 +345,15 @@ export default function Deck({
       }
     };
     return () => c.close();
-  }, [campaignId]);
+  }, [campaignId, readOnly]);
 
   useEffect(() => {
-    if (applyingRemote.current) {
+    if (readOnly || applyingRemote.current) {
       applyingRemote.current = false;
       return;
     }
     chan.current?.postMessage({ type: 'state', slide, clicks });
-  }, [slide, clicks]);
+  }, [slide, clicks, readOnly]);
 
   // Fullscreen tracking & idle auto-hide
   useEffect(() => {
@@ -392,7 +395,7 @@ export default function Deck({
   const nextSlide = slides[slide + 1];
   const hideUI = uiHidden || (fs && !nearDock);
   const cursorHidden = fs && cursorIdle && !drawing;
-  const showAnnotator = drawing || (annStore.current[slide]?.length ?? 0) > 0;
+  const showAnnotator = !readOnly && (drawing || (annStore.current[slide]?.length ?? 0) > 0);
 
   const navCluster = (
     <>
@@ -510,7 +513,7 @@ export default function Deck({
           </div>
         )}
 
-        {isPresenter && (
+        {!readOnly && isPresenter && (
           <div className="noir-presenter" role="region" aria-label="Presenter control window">
             <div className="noir-presenter-row">
               <span className="noir-presenter-label">
@@ -564,15 +567,17 @@ export default function Deck({
             <span className="noir-sep" />
             <div className="noir-nav-inline">{navCluster}</div>
             <span className="noir-sep" />
-            <button
-              className={'noir-icon-btn' + (drawing ? ' on' : '')}
-              data-tip="Annotate (A)"
-              aria-label="Canvas drawing tool"
-              aria-pressed={drawing}
-              onClick={() => setDrawing((v) => !v)}
-            >
-              <IconPencil />
-            </button>
+            {!readOnly && (
+              <button
+                className={'noir-icon-btn' + (drawing ? ' on' : '')}
+                data-tip="Annotate (A)"
+                aria-label="Canvas drawing tool"
+                aria-pressed={drawing}
+                onClick={() => setDrawing((v) => !v)}
+              >
+                <IconPencil />
+              </button>
+            )}
             <button
               className="noir-icon-btn"
               data-tip={fs ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
@@ -581,14 +586,16 @@ export default function Deck({
             >
               {fs ? <IconShrink /> : <IconExpand />}
             </button>
-            <button
-              className="noir-icon-btn"
-              data-tip="Presenter — new tab (P)"
-              aria-label="Open presenter view in new tab"
-              onClick={openPresenter}
-            >
-              <IconPresent />
-            </button>
+            {!readOnly && (
+              <button
+                className="noir-icon-btn"
+                data-tip="Presenter — new tab (P)"
+                aria-label="Open presenter view in new tab"
+                onClick={openPresenter}
+              >
+                <IconPresent />
+              </button>
+            )}
           </div>
         </nav>
       </div>

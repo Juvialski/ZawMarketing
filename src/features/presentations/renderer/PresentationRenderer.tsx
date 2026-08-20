@@ -15,6 +15,7 @@ export interface PresentationRendererProps {
   className?: string;
   style?: React.CSSProperties;
   onNotesChange?: (slideIndex: number, notes: string) => void;
+  readOnly?: boolean;
 }
 
 export const PresentationRenderer: React.FC<PresentationRendererProps> = ({
@@ -24,6 +25,7 @@ export const PresentationRenderer: React.FC<PresentationRendererProps> = ({
   className = '',
   style = {},
   onNotesChange,
+  readOnly = false,
 }) => {
   const themeStyles = themeToCssVariables(deck.theme);
   const isDemo = deck.isDemo ?? (campaign?.tags?.includes('Demo') || campaign?.id.includes('demo') || campaign?.id.includes('sample'));
@@ -38,6 +40,7 @@ export const PresentationRenderer: React.FC<PresentationRendererProps> = ({
         style={themeStyles}
         className={className}
         onNotesChange={onNotesChange}
+        readOnly={readOnly}
       >
         {visibleSlides.map((slide) => (
           <SemanticSlideRenderer

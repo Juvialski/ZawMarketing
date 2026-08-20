@@ -487,6 +487,129 @@ export interface Database {
         };
         Relationships: [];
       };
+      campaign_review_links: {
+        Row: {
+          id: string;
+          organization_id: string;
+          campaign_id: string;
+          token_hash: string;
+          is_active: boolean;
+          expires_at: string | null;
+          allow_comments: boolean;
+          allow_selection: boolean;
+          allow_approval: boolean;
+          allow_downloads: boolean;
+          passcode_hash: string | null;
+          current_version_number: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          campaign_id: string;
+          token_hash: string;
+          is_active?: boolean;
+          expires_at?: string | null;
+          allow_comments?: boolean;
+          allow_selection?: boolean;
+          allow_approval?: boolean;
+          allow_downloads?: boolean;
+          passcode_hash?: string | null;
+          current_version_number?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          campaign_id?: string;
+          token_hash?: string;
+          is_active?: boolean;
+          expires_at?: string | null;
+          allow_comments?: boolean;
+          allow_selection?: boolean;
+          allow_approval?: boolean;
+          allow_downloads?: boolean;
+          passcode_hash?: string | null;
+          current_version_number?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      campaign_review_versions: {
+        Row: {
+          id: string;
+          review_link_id: string;
+          version_number: number;
+          title: string;
+          notes: string | null;
+          published_snapshot: Json;
+          published_at: string;
+        };
+        Insert: {
+          id?: string;
+          review_link_id: string;
+          version_number: number;
+          title?: string;
+          notes?: string | null;
+          published_snapshot: Json;
+          published_at?: string;
+        };
+        Update: {
+          id?: string;
+          review_link_id?: string;
+          version_number?: number;
+          title?: string;
+          notes?: string | null;
+          published_snapshot?: Json;
+          published_at?: string;
+        };
+        Relationships: [];
+      };
+      campaign_review_feedback: {
+        Row: {
+          id: string;
+          review_link_id: string;
+          review_version_id: string | null;
+          material_key: string;
+          variant_key: string | null;
+          reviewer_name: string | null;
+          status: 'not_reviewed' | 'preferred' | 'approved' | 'needs_changes';
+          comment: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          review_link_id: string;
+          review_version_id?: string | null;
+          material_key: string;
+          variant_key?: string | null;
+          reviewer_name?: string | null;
+          status?: 'not_reviewed' | 'preferred' | 'approved' | 'needs_changes';
+          comment?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          review_link_id?: string;
+          review_version_id?: string | null;
+          material_key?: string;
+          variant_key?: string | null;
+          reviewer_name?: string | null;
+          status?: 'not_reviewed' | 'preferred' | 'approved' | 'needs_changes';
+          comment?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       is_org_member: {
@@ -501,6 +624,33 @@ export interface Database {
           check_user_id: string;
         };
         Returns: string[];
+      };
+      get_public_review_snapshot: {
+        Args: {
+          p_token_hash: string;
+          p_passcode_hash?: string;
+        };
+        Returns: Json;
+      };
+      submit_public_review_feedback: {
+        Args: {
+          p_token_hash: string;
+          p_material_key: string;
+          p_variant_key?: string;
+          p_status?: string;
+          p_comment?: string;
+          p_reviewer_name?: string;
+        };
+        Returns: Json;
+      };
+      submit_public_campaign_approval: {
+        Args: {
+          p_token_hash: string;
+          p_status?: string;
+          p_notes?: string;
+          p_reviewer_name?: string;
+        };
+        Returns: Json;
       };
     };
   };

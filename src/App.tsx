@@ -11,6 +11,7 @@ import { AuthModal } from './components/auth/AuthModal';
 import { PresentationRenderer } from './features/presentations/renderer/PresentationRenderer';
 import { generateDeterministicPresentationDeck } from './features/presentations/services/demoDeckGenerator';
 import { SAMPLE_CAMPAIGNS } from './data/sampleCampaigns';
+import { CampaignReviewPortal } from './components/review/CampaignReviewPortal';
 import { Presentation, AlertTriangle } from 'lucide-react';
 
 import { Campaign, CampaignSourceData } from './types/campaign';
@@ -40,6 +41,22 @@ export function App() {
   });
   const [dataError, setDataError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Review mode parameters (/review/:token or ?review=:token)
+  const { isReviewMode, reviewToken } = useMemo(() => {
+    if (typeof window === 'undefined') return { isReviewMode: false, reviewToken: null };
+    const pathname = window.location.pathname;
+    const match = pathname.match(/^\/review\/([^/?#]+)/i);
+    if (match) {
+      return { isReviewMode: true, reviewToken: decodeURIComponent(match[1]) };
+    }
+    const params = new URLSearchParams(window.location.search);
+    const qReview = params.get('review');
+    if (qReview) {
+      return { isReviewMode: true, reviewToken: qReview };
+    }
+    return { isReviewMode: false, reviewToken: null };
+  }, []);
 
   // Presenter mode parameters
   const { isPresenterMode, presenterCampaignId } = useMemo(() => {
@@ -302,6 +319,13 @@ export function App() {
       void loadData();
     }
   };
+
+  // -------------------------------------------------------------
+  // PUBLIC CLIENT REVIEW PORTAL STANDALONE ENTRY (/review/:token)
+  // -------------------------------------------------------------
+  if (isReviewMode && reviewToken) {
+    return <CampaignReviewPortal token={reviewToken} />;
+  }
 
   // -------------------------------------------------------------
   // PRESENTER MODE STANDALONE ENTRY (Issue 6)

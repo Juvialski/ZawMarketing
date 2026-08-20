@@ -25,6 +25,7 @@ interface FullMarketingKitViewProps {
   organizationId?: string;
   runtimeMode: 'demo' | 'live';
   onUpdateCampaign: (updated: Campaign) => void;
+  onOpenReview?: () => void;
 }
 
 export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
@@ -33,6 +34,7 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
   organizationId,
   runtimeMode,
   onUpdateCampaign,
+  onOpenReview,
 }) => {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isReviewingPremium, setIsReviewingPremium] = useState(false);
@@ -201,6 +203,17 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
                 )}
                 <span>{isReviewingPremium ? 'Reviewing...' : 'Professional Review'}</span>
               </button>
+
+              {onOpenReview && (
+                <button
+                  onClick={onOpenReview}
+                  className="w-full sm:w-auto px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Create or manage shareable review link for clients and bosses"
+                >
+                  <Share2 className="w-4 h-4 text-amber-400" />
+                  <span>Share / Review</span>
+                </button>
+              )}
 
               <button
                 onClick={handleDownloadZip}

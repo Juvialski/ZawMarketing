@@ -7,6 +7,7 @@ import { DesignEditor } from '../designs/DesignEditor';
 import { FullMarketingKitView } from './FullMarketingKitView';
 import { SourceIntakeForm } from './SourceIntakeForm';
 import { PresentationWorkspace } from '../../features/presentations/components/PresentationWorkspace';
+import { ShareReviewWorkspace } from './ShareReviewWorkspace';
 import { 
   Compass, 
   FileText, 
@@ -15,7 +16,8 @@ import {
   SlidersHorizontal,
   ArrowLeft,
   MapPin,
-  Presentation
+  Presentation,
+  Share2
 } from 'lucide-react';
 
 interface CampaignWorkspaceProps {
@@ -27,7 +29,7 @@ interface CampaignWorkspaceProps {
   onBack: () => void;
 }
 
-type WorkspaceTab = 'kit' | 'strategy' | 'copy' | 'designs' | 'presentation' | 'intake';
+type WorkspaceTab = 'kit' | 'strategy' | 'copy' | 'designs' | 'presentation' | 'review' | 'intake';
 
 export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
   campaign,
@@ -114,6 +116,7 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
             { id: 'copy', label: 'Copy Studio', icon: FileText },
             { id: 'designs', label: 'Design & Flyers', icon: ImageIcon },
             { id: 'presentation', label: 'Investment Deck', icon: Presentation },
+            { id: 'review', label: 'Share & Review', icon: Share2 },
             { id: 'intake', label: 'Property Data', icon: SlidersHorizontal },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -145,6 +148,7 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
             organizationId={organizationId}
             runtimeMode={runtimeMode}
             onUpdateCampaign={onUpdateCampaign}
+            onOpenReview={() => setActiveTab('review')}
           />
         )}
 
@@ -179,6 +183,16 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
 
         {activeTab === 'presentation' && (
           <PresentationWorkspace
+            campaign={campaign}
+            brandKit={brandKit}
+            organizationId={organizationId}
+            runtimeMode={runtimeMode}
+            onUpdateCampaign={onUpdateCampaign}
+          />
+        )}
+
+        {activeTab === 'review' && (
+          <ShareReviewWorkspace
             campaign={campaign}
             brandKit={brandKit}
             organizationId={organizationId}
