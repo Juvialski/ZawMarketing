@@ -36,3 +36,22 @@ enable_signup = true
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+
+[functions.critique-copy]
+verify_jwt = true
+
+[functions.generate-campaign-strategy]
+verify_jwt = true
+
+[functions.generate-copy]
+verify_jwt = true
+
+[functions.generate-image]
+verify_jwt = true
+
+[functions.generate-presentation]
+verify_jwt = true
+
+[functions.health]
+verify_jwt = true
+
