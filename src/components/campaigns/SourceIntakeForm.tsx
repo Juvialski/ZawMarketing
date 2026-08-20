@@ -1,23 +1,29 @@
 import React, { useState } from 'react';
 import { CampaignSourceData, CampaignType, CampaignImage } from '../../types/campaign';
 import { CURATED_STOCK_PHOTOS } from '../../services/providers/imageProvider';
+import { StorageService } from '../../services/supabase/storageService';
 import { 
   DollarSign, 
   Upload, 
   Sparkles, 
   Image as ImageIcon, 
   Trash2,
-  MapPin
+  MapPin,
+  Loader2
 } from 'lucide-react';
 
 interface SourceIntakeFormProps {
   initialData?: Partial<CampaignSourceData>;
+  organizationId?: string;
+  campaignId?: string;
   onSave: (data: CampaignSourceData) => void;
   onCancel?: () => void;
 }
 
 export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
   initialData,
+  organizationId = 'a0000000-0000-0000-0000-000000000001',
+  campaignId = 'temp-campaign',
   onSave,
   onCancel,
 }) => {
@@ -65,27 +71,37 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
       },
     ]
   );
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const resultUrl = event.target?.result as string;
+    setIsUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const { publicUrl } = await StorageService.uploadPropertyPhoto(
+          organizationId,
+          campaignId,
+          file
+        );
+
         const newImg: CampaignImage = {
-          id: `upload-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          url: resultUrl,
+          id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          url: publicUrl,
           name: file.name,
           source: 'upload',
           aspectRatio: 1.5,
           isHero: uploadedImages.length === 0,
         };
+
         setUploadedImages((prev) => [...prev, newImg]);
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+    } catch (err) {
+      console.error('Photo upload failed', err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleSelectCuratedStock = (photo: typeof CURATED_STOCK_PHOTOS[0]) => {
@@ -398,12 +414,12 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
         </div>
       </div>
 
-      {/* 6. Photography & Asset Upload */}
+      {/* 6. Photography & Asset Upload (Supabase Storage Enabled) */}
       <div className="p-5 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-slate-600" />
-            Property Photography (Upload & Select Hero)
+            Property Photography (Supabase Storage)
           </h3>
           <span className="text-[11px] text-slate-500">{uploadedImages.length} photos ready</span>
         </div>
@@ -411,9 +427,9 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
         {/* Upload Button & Quick Add */}
         <div className="flex flex-wrap items-center gap-3">
           <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-sm">
-            <Upload className="w-3.5 h-3.5" />
-            <span>Upload Photos from PC</span>
-            <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="hidden" />
+            {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            <span>{isUploading ? 'Uploading to Storage...' : 'Upload Photos (Supabase)'}</span>
+            <input type="file" multiple accept="image/*" onChange={handleImageUpload} disabled={isUploading} className="hidden" />
           </label>
 
           <span className="text-xs text-slate-400">or add curated real estate photography:</span>
