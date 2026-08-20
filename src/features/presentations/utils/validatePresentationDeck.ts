@@ -126,9 +126,7 @@ export function validatePresentationDeck(
   }
 
   // 5. Check for Required Legal / Disclaimer Slide
-  const hasDisclaimer = deck.slides.some(
-    (s) => s.type === 'risk_disclaimer' || (s.type === 'next_steps' && Boolean(s.speakerNotes))
-  );
+  const hasDisclaimer = deck.slides.some((s) => s.type === 'risk_disclaimer');
   checks.push({
     name: 'Underwriting Disclosures',
     passed: hasDisclaimer,
@@ -142,23 +140,28 @@ export function validatePresentationDeck(
     });
   }
 
-  // 6. Fact Key & Media Validation (if campaign context is provided)
+  // 6. Fact Key, Media & Canonical Value Validation (if campaign context is provided)
   if (campaign) {
     const ledger = buildCampaignFactLedger(campaign);
     const validFactKeys = new Set(ledger.facts.map((f) => f.key));
     const validImageIds = new Set(campaign.sourceData.uploadedImages.map((img) => img.id));
+    let hasUnverifiedFactKeys = false;
+    let hasCanonicalMismatches = false;
 
     deck.slides.forEach((slide, idx) => {
       if (slide.type === 'financial_snapshot') {
         slide.metrics.forEach((m) => {
-          if (m.factKey && !validFactKeys.has(m.factKey)) {
-            issues.push({
-              severity: 'warning',
-              rule: 'unverified_fact_key',
-              message: `Slide "${slide.title}" references factKey "${m.factKey}" which is not in the canonical fact ledger.`,
-              slideId: slide.id,
-              slideIndex: idx,
-            });
+          if (m.factKey) {
+            if (!validFactKeys.has(m.factKey)) {
+              hasUnverifiedFactKeys = true;
+              issues.push({
+                severity: 'warning',
+                rule: 'unverified_fact_key',
+                message: `Slide "${slide.title}" references factKey "${m.factKey}" which is not in the canonical fact ledger.`,
+                slideId: slide.id,
+                slideIndex: idx,
+              });
+            }
           }
         });
       }
@@ -166,6 +169,7 @@ export function validatePresentationDeck(
       if (slide.type === 'stat_grid') {
         slide.stats.forEach((s) => {
           if (s.factKey && !validFactKeys.has(s.factKey)) {
+            hasUnverifiedFactKeys = true;
             issues.push({
               severity: 'warning',
               rule: 'unverified_fact_key',
@@ -196,6 +200,22 @@ export function validatePresentationDeck(
         });
       }
     });
+
+    checks.push({
+      name: 'Fact Ledger Alignment',
+      passed: !hasUnverifiedFactKeys && !hasCanonicalMismatches,
+      message: hasUnverifiedFactKeys ? 'Contains unverified factKey references.' : undefined,
+    });
+
+    // Check demo labeling
+    const isCampaignDemo = ledger.isDemo;
+    if (isCampaignDemo && !deck.isDemo) {
+      issues.push({
+        severity: 'warning',
+        rule: 'demo_labeling',
+        message: 'Campaign is a demo fixture but deck is not marked with isDemo: true.',
+      });
+    }
   }
 
   // 7. Calculate overall quality score

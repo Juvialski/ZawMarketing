@@ -43,4 +43,66 @@ describe('demoDeckGenerator (Deterministic Fixture Generation)', () => {
       expect(capMetric?.value).toBe('9.4%');
     }
   });
+
+  it('generates safe neutral placeholders for generic campaigns without fabricated Phoenix/Dallas facts', () => {
+    const genericCampaign: typeof phoenixCampaign = {
+      id: 'campaign-arbitrary-123',
+      name: 'Custom Acquisition Deal',
+      createdAt: '2026-08-20T10:00:00Z',
+      updatedAt: '2026-08-20T10:00:00Z',
+      status: 'draft',
+      tags: ['Live', 'Custom'],
+      brandKitId: 'brand-default',
+      sourceData: {
+        campaignType: 'fix_and_flip',
+        title: 'Custom Live Deal',
+        targetMarket: 'Seattle, WA',
+        uploadedImages: [],
+        property: {
+          address: '100 Main St',
+          city: 'Seattle',
+          state: 'WA',
+          zipCode: '98101',
+          propertyType: 'single_family',
+          squareFeet: 1500,
+          bedrooms: 3,
+          bathrooms: 2,
+          investmentThesis: 'Live deal investment thesis',
+          dealHighlights: ['Strong location', 'Good schools'],
+          financials: {},
+        },
+      },
+      designConfigs: phoenixCampaign.designConfigs,
+    };
+
+    const deck = generateDeterministicPresentationDeck(genericCampaign, DEFAULT_BRAND_KIT);
+    const parseResult = presentationDeckSchema.safeParse(deck);
+    expect(parseResult.success).toBe(true);
+
+    // Property overview should not contain Phoenix address
+    const propSlide = deck.slides.find((s) => s.type === 'property_overview');
+    expect(propSlide).toBeDefined();
+    if (propSlide && propSlide.type === 'property_overview') {
+      expect(propSlide.address).not.toContain('4421 E Cambridge');
+      expect(propSlide.address).toBe('100 Main St');
+      expect(propSlide.city).toBe('Seattle');
+    }
+
+    // Financials should not contain Phoenix $285,000 / $390,000 values
+    const finSlide = deck.slides.find((s) => s.type === 'financial_snapshot');
+    expect(finSlide).toBeDefined();
+    if (finSlide && finSlide.type === 'financial_snapshot') {
+      const purchaseMetric = finSlide.metrics.find((m) => m.factKey === 'purchase_price');
+      expect(purchaseMetric?.value).toBe('Not provided');
+      const arvMetric = finSlide.metrics.find((m) => m.factKey === 'arv');
+      expect(arvMetric?.value).toBe('Not provided');
+    }
+
+    // Market slide should not contain Phoenix comps
+    const marketSlide = deck.slides.find((s) => s.type === 'market_context');
+    expect(marketSlide).toBeDefined();
+    if (marketSlide && marketSlide.type === 'market_context') {
+      expect(marketSlide.comps).toBeUndefined();
+    }
+  });
 });

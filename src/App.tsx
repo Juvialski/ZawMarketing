@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AppShell } from './components/layout/AppShell';
 import { DashboardOverview } from './components/dashboard/DashboardOverview';
 import { CampaignLibrary } from './components/campaigns/CampaignLibrary';
@@ -8,6 +8,10 @@ import { BrandKitManager } from './components/brand/BrandKitManager';
 import { LeadFinder } from './components/leads/LeadFinder';
 import { SettingsView } from './components/settings/SettingsView';
 import { AuthModal } from './components/auth/AuthModal';
+import { PresentationRenderer } from './features/presentations/renderer/PresentationRenderer';
+import { generateDeterministicPresentationDeck } from './features/presentations/services/demoDeckGenerator';
+import { SAMPLE_CAMPAIGNS } from './data/sampleCampaigns';
+import { Presentation, AlertTriangle } from 'lucide-react';
 
 import { Campaign, CampaignSourceData } from './types/campaign';
 import { BrandKit } from './types/brandKit';
@@ -31,6 +35,15 @@ export function App() {
   const [runtimeMode, setRuntimeMode] = useState<'demo' | 'live'>(() => (isSupabaseConfigured() ? 'live' : 'demo'));
   const [dataError, setDataError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Presenter mode parameters
+  const { isPresenterMode, presenterCampaignId } = useMemo(() => {
+    if (typeof window === 'undefined') return { isPresenterMode: false, presenterCampaignId: null };
+    const params = new URLSearchParams(window.location.search);
+    const presenter = params.get('presenter') === '1' || params.has('presenter');
+    const campaignId = params.get('campaign');
+    return { isPresenterMode: presenter, presenterCampaignId: campaignId };
+  }, []);
 
   const loadData = async () => {
     const live = isSupabaseConfigured();
@@ -206,6 +219,95 @@ export function App() {
       void loadData();
     }
   };
+
+  // -------------------------------------------------------------
+  // PRESENTER MODE STANDALONE ENTRY (Issue 6)
+  // -------------------------------------------------------------
+  if (isPresenterMode && presenterCampaignId) {
+    // Resolve presenter campaign
+    let presenterCampaign = campaigns.find((c) => c.id === presenterCampaignId);
+
+    if (!presenterCampaign && runtimeMode === 'demo') {
+      presenterCampaign =
+        CampaignStore.getById(presenterCampaignId, { allowDemoFixtures: true }) ||
+        SAMPLE_CAMPAIGNS.find((c) => c.id === presenterCampaignId);
+    }
+
+    if (!presenterCampaign) {
+      return (
+        <div className="w-screen h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center text-red-400">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-serif font-bold text-slate-100">Campaign Not Found or Access Restricted</h1>
+          <p className="text-sm text-slate-400 max-w-md">
+            Could not resolve campaign "{presenterCampaignId}". {runtimeMode === 'live' ? 'Ensure you are signed in to an organization with access to this campaign.' : 'Please verify the demo campaign ID.'}
+          </p>
+          {runtimeMode === 'live' && !profile && (
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-500 transition-colors"
+            >
+              Sign In to Access Campaign
+            </button>
+          )}
+          <a
+            href={window.location.pathname}
+            className="px-4 py-2 bg-slate-800 text-slate-200 rounded-lg text-xs font-semibold hover:bg-slate-700 transition-colors"
+          >
+            Return to Dashboard
+          </a>
+          <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onAuthSuccess={() => { void loadData(); setIsAuthModalOpen(false); }} />
+        </div>
+      );
+    }
+
+    const isDemoCampaign = runtimeMode === 'demo' || presenterCampaign.tags?.includes('Demo') || presenterCampaign.tags?.includes('Fictional');
+    const presenterDeck = presenterCampaign.presentation || (isDemoCampaign ? generateDeterministicPresentationDeck(presenterCampaign, brandKit) : null);
+
+    if (!presenterDeck) {
+      return (
+        <div className="w-screen h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center text-amber-400">
+            <Presentation className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-serif font-bold text-slate-100">Presentation Deck Not Found</h1>
+          <p className="text-sm text-slate-400 max-w-md">
+            The campaign "{presenterCampaign.name}" does not have an active presentation deck. Please open the Campaign Studio to generate one.
+          </p>
+          <a
+            href={window.location.pathname}
+            className="px-4 py-2 bg-white text-slate-900 rounded-lg text-xs font-semibold hover:bg-slate-100 transition-colors"
+          >
+            Return to Dashboard
+          </a>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-screen h-screen bg-slate-950 overflow-hidden flex flex-col">
+        <PresentationRenderer
+          deck={presenterDeck}
+          campaign={presenterCampaign}
+          brandKit={brandKit}
+          onNotesChange={(slideIndex, notes) => {
+            if (presenterCampaign && presenterDeck) {
+              const updatedSlides = [...presenterDeck.slides];
+              if (updatedSlides[slideIndex]) {
+                updatedSlides[slideIndex] = {
+                  ...updatedSlides[slideIndex],
+                  speakerNotes: notes,
+                };
+                const updatedDeck = { ...presenterDeck, slides: updatedSlides };
+                void handleUpdateCampaign({ ...presenterCampaign, presentation: updatedDeck });
+              }
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <AppShell

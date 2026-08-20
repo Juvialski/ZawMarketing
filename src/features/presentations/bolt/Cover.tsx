@@ -24,28 +24,30 @@ export default function Cover({
           <div className="cover-scrim" aria-hidden="true" />
         </>
       )}
-      <Reveal>
-        {kicker && (
-          <div className="kicker" style={{ marginBottom: 14 }}>
-            {kicker}
-          </div>
+      <div className="slide-container" style={{ maxWidth: 960 }}>
+        <Reveal>
+          {kicker && (
+            <div className="kicker" style={{ marginBottom: 8 }}>
+              {kicker}
+            </div>
+          )}
+        </Reveal>
+        <Reveal delay={0.08}>
+          <h1 className="display">{title}</h1>
+        </Reveal>
+        {subtitle && (
+          <Reveal delay={0.16}>
+            <p className="subhead" style={{ marginTop: 10 }}>
+              {subtitle}
+            </p>
+          </Reveal>
         )}
-      </Reveal>
-      <Reveal delay={0.08}>
-        <h1 className="display">{title}</h1>
-      </Reveal>
-      {subtitle && (
-        <Reveal delay={0.16}>
-          <p className="subhead" style={{ marginTop: 18 }}>
-            {subtitle}
-          </p>
-        </Reveal>
-      )}
-      {foot && (
-        <Reveal delay={0.24} className="cover-foot">
-          <div className="foot">{foot}</div>
-        </Reveal>
-      )}
+        {foot && (
+          <Reveal delay={0.24} className="cover-foot">
+            <div className="foot">{foot}</div>
+          </Reveal>
+        )}
+      </div>
     </div>
   );
 }
