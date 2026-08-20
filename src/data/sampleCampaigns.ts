@@ -5,9 +5,9 @@ export const SAMPLE_CAMPAIGNS: Campaign[] = [
     id: 'campaign-phoenix-fix-flip',
     createdAt: '2026-08-15T09:00:00Z',
     updatedAt: '2026-08-18T14:30:00Z',
-    name: 'Phoenix Value-Add Single Family Flip ($285k Basis)',
+    name: 'Demo · Phoenix Value-Add Single Family Flip ($285k Basis)',
     status: 'completed',
-    tags: ['Value-Add', 'Single Family', 'Phoenix Metro', 'Quick Turnaround'],
+    tags: ['Demo', 'Fictional', 'Value-Add', 'Single Family', 'Phoenix Metro'],
     brandKitId: 'brand-default',
     sourceData: {
       campaignType: 'fix_and_flip',
@@ -16,8 +16,8 @@ export const SAMPLE_CAMPAIGNS: Campaign[] = [
       uploadedImages: [
         {
           id: 'phx-img-1',
-          url: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=1600&q=80',
-          name: 'Front Exterior Elevation',
+          url: '/demo/fictional-property-exterior.png',
+          name: 'Fictional Demo Exterior',
           source: 'sample',
           aspectRatio: 1.5,
           isHero: true,
@@ -25,21 +25,12 @@ export const SAMPLE_CAMPAIGNS: Campaign[] = [
         },
         {
           id: 'phx-img-2',
-          url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=80',
-          name: 'Kitchen & Living Layout',
+          url: '/demo/fictional-property-interior.png',
+          name: 'Fictional Demo Kitchen & Living Layout',
           source: 'sample',
           aspectRatio: 1.5,
           isHero: false,
           altText: 'Open concept interior living space with natural lighting',
-        },
-        {
-          id: 'phx-img-3',
-          url: 'https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=1600&q=80',
-          name: 'Primary Suite / Bath',
-          source: 'sample',
-          aspectRatio: 1.5,
-          isHero: false,
-          altText: 'Spacious master suite layout ready for cosmetic modernization',
         },
       ],
       selectedHeroImageId: 'phx-img-1',
@@ -61,23 +52,23 @@ export const SAMPLE_CAMPAIGNS: Campaign[] = [
           arv: 390000,
           projectedProfit: 45000,
           equitySpread: 70000,
-          roiPercent: 21.8,
+          roiPercent: 21.9,
         },
         investmentThesis: 'Acquire at $155/sqft ($75k below recent neighborhood comps). Minor cosmetic scope (kitchen reface, bathroom modernize, interior/exterior paint, desert turf). 60-day turnaround projected for resale to owner-occupant buyers.',
         renovationScope: 'Cabinet refinishing & quartz counters, LVP flooring throughout, dual vanity bath upgrade, low-water exterior curb appeal.',
         dealHighlights: [
           'Purchase basis: $285,000 ($154.89/sqft)',
           'Estimated renovation: $35,000 (Cosmetic only)',
-          'Conservative ARV: $390,000 ($211.95/sqft)',
-          '$70,000 gross equity spread before disposition costs',
+          'Conservative ARV: $390,000 ($211.96/sqft)',
+          '$70,000 gross equity spread (21.9% on cost) before disposition costs',
           'Submarket average DOM currently 24 days',
         ],
-        notes: 'Clear title, vacant on close, standard 10-day inspection period.',
+        notes: 'Clear title, vacant on close, standard 10-day inspection period. DEMO / FICTIONAL SAMPLE.',
       },
     },
     strategy: {
       targetAudience: {
-        name: 'Active Fix & Flip Investors & Private Lenders',
+        name: 'Active Fix & Flip Investors & Private Capital Partners',
         description: 'Local and regional real estate investors seeking clean cosmetic flips with documented spread and strong submarket liquidity.',
         painPoints: [
           'High acquisition competition on MLS driving down margins',
@@ -97,7 +88,7 @@ export const SAMPLE_CAMPAIGNS: Campaign[] = [
         'Cosmetic-only $35k renovation scope (no structural work)',
         '$155/sqft entry price vs. $215/sqft neighborhood median',
       ],
-      valueProposition: 'Underwritten value-add property offering an immediate $70,000 equity spread with strict cosmetic scope and verified comp support.',
+      valueProposition: 'Underwritten value-add property offering an immediate $70,000 gross spread (21.9% on cost) with strict cosmetic scope and verified comp support.',
       supportingEvidence: [
         'Recent comp 4318 E Cambridge sold at $405,000 (1,810 sqft, renovated)',
         'Recent comp 4502 E Montecito sold at $392,000 (1,780 sqft, standard update)',
@@ -109,7 +100,7 @@ export const SAMPLE_CAMPAIGNS: Campaign[] = [
     copy: {
       headlines: [
         'Phoenix Value-Add Opportunity: $285k Entry with $390k Conservative ARV',
-        'Light Cosmetic Flip in Arcadia Corridor: $70,000 Gross Equity Spread',
+        'Light Cosmetic Flip in Arcadia Corridor: $70,000 Projected Gross Spread',
         'Off-Market Phoenix 3-Bed: $155/SF Basis with Verified Comp Support',
       ],
       ctas: [
@@ -119,20 +110,20 @@ export const SAMPLE_CAMPAIGNS: Campaign[] = [
       ],
       facebook: {
         headline: 'Phoenix Value-Add Opportunity: $285k Purchase / $390k ARV',
-        body: 'New acquisition opportunity in Phoenix (Arcadia Lite submarket).\n\nKey economics:\n• Purchase Price: $285,000 ($155/sqft)\n• Estimated Renovation: $35,000 (cosmetic scope)\n• Conservative ARV: $390,000\n• Gross Spread: $70,000\n\nProperty details: 3 bedrooms, 2 baths, 1,840 sq ft on a 7,200 sq ft lot. Built 1978 with clean structural inspection.\n\nComps in immediate 0.5-mile radius support $210–$225/sqft for completed finishes. Submarket days on market currently averages 24 days.\n\nFull scope breakdown, comparable sales matrix, and inspection notes are available for verified buyers.',
+        body: 'New acquisition opportunity in Phoenix (Arcadia Lite submarket).\n\nKey economics:\n• Purchase Price: $285,000 ($155/sqft)\n• Estimated Renovation: $35,000 (cosmetic scope)\n• Conservative ARV: $390,000\n• Projected Gross Spread: $70,000 (21.9% on cost)\n\nProperty details: 3 bedrooms, 2 baths, 1,840 sq ft on a 7,200 sq ft lot. Built 1978 with clean structural inspection.\n\nComps in immediate 0.5-mile radius support $210–$225/sqft for completed finishes. Submarket days on market currently averages 24 days.\n\nFull scope breakdown, comparable sales matrix, and inspection notes are available for verified buyers.',
         cta: 'Comment or message "PHOENIX" to receive the underwriting file.',
         characterCount: 618,
       },
       instagram: {
         headline: '$285K Basis | $390K ARV | Phoenix Value-Add',
-        body: 'Underwriting breakdown on our newest Phoenix acquisition:\n\n📍 Phoenix, AZ (Arcadia Lite Corridor)\n📐 3 Bed | 2 Bath | 1,840 Sq Ft\n💵 Purchase Price: $285,000 ($155/SF)\n🔨 Estimated Scope: $35,000 (Cosmetic)\n📈 Underwritten ARV: $390,000 ($212/SF)\n💰 Gross Equity Spread: $70,000\n\nScope overview: Kitchen reface with quartz counters, LVP flooring throughout, dual-vanity master upgrade, and desert landscape refresh. Zero structural or foundation work required.\n\nRecent renovated comp at 4318 E Cambridge closed at $405,000.\n\nLink in bio for full deal deck and photo archive.',
+        body: 'Underwriting breakdown on our newest Phoenix acquisition:\n\n📍 Phoenix, AZ (Arcadia Lite Corridor)\n📐 3 Bed | 2 Bath | 1,840 Sq Ft\n💵 Purchase Price: $285,000 ($155/SF)\n🔨 Estimated Scope: $35,000 (Cosmetic)\n📈 Underwritten ARV: $390,000 ($212/SF)\n💰 Projected Gross Spread: $70,000 (21.9% on cost)\n\nScope overview: Kitchen reface with quartz counters, LVP flooring throughout, dual-vanity master upgrade, and desert landscape refresh. Zero structural or foundation work required.\n\nRecent renovated comp at 4318 E Cambridge closed at $405,000.\n\nLink in bio for full deal deck and photo archive.',
         cta: 'Link in bio for full underwriting deck.',
         hashtags: ['#PhoenixRealEstate', '#RealEstateInvesting', '#FixAndFlip', '#ValueAddRealEstate', '#PropertyInvestment', '#ArizonaRealEstate'],
         characterCount: 685,
       },
       linkedin: {
         headline: 'Acquisition Underwriting Brief: 4421 E Cambridge Ave, Phoenix AZ',
-        body: 'Investment Memorandum Summary:\n\nWe have underwritten and secured an off-market value-add single family asset in the Phoenix Arcadia Lite corridor.\n\nTransaction Metrics:\n• Acquisition Basis: $285,000 ($154.89/sqft)\n• Capital Expenditure Budget: $35,000 (Cosmetic refit)\n• Total Project Basis: $320,000\n• Underwritten Exit (ARV): $390,000 ($211.95/sqft)\n• Projected Gross Margin: 17.9% on cost ($70,000 spread)\n\nMarket Context:\nThe central Phoenix submarket maintains 1.8 months of inventory for sub-$450k renovated single-family product. With an average marketing time of 24 days, demand for turn-key starter homes remains resilient against broader interest rate friction.\n\nThe project scope is strictly interior/exterior cosmetic modernization without structural alterations, limiting timeline and supply-chain exposure.\n\nAccredited partners and operators can review the full financial pro forma and contractor line-item scope upon request.',
+        body: 'Investment Memorandum Summary:\n\nWe have underwritten and secured an off-market value-add single family asset in the Phoenix Arcadia Lite corridor.\n\nTransaction Metrics:\n• Acquisition Basis: $285,000 ($154.89/sqft)\n• Capital Expenditure Budget: $35,000 (Cosmetic refit)\n• Total Project Basis: $320,000\n• Underwritten Exit (ARV): $390,000 ($211.96/sqft)\n• Projected Gross Margin: 21.9% on cost ($70,000 gross spread before holding/selling costs)\n\nMarket Context:\nThe central Phoenix submarket maintains 1.8 months of inventory for sub-$450k renovated single-family product. With an average marketing time of 24 days, demand for turn-key starter homes remains resilient against broader interest rate friction.\n\nThe project scope is strictly interior/exterior cosmetic modernization without structural alterations, limiting timeline and supply-chain exposure (60-day projected turnaround).\n\nAccredited partners and operators can review the full financial pro forma and contractor line-item scope upon request.',
         cta: 'Connect or direct message for the complete investment memorandum.',
         characterCount: 978,
       },
@@ -152,8 +143,8 @@ We are presenting the underwriting package for our newest acquisition in the Pho
 * **Estimated Renovation:** $35,000
 * **All-In Basis:** $320,000
 * **After Repair Value (ARV):** $390,000
-* **Projected Gross Spread:** $70,000
-* **Target Turnaround:** 75 Days (30-day renovation + 45-day disposition)
+* **Projected Gross Spread:** $70,000 (21.9% on total cost)
+* **Target Turnaround:** 60 Days (30-day renovation + 30-day disposition)
 
 #### Property Specifications
 * **Configuration:** 3 Bed / 2 Bath
@@ -209,15 +200,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         slopIndex: 'clean',
         factualIntegrityVerified: true,
         unsupportedClaimsDetected: [],
-        issues: [
-          {
-            id: 'clarity-1',
-            severity: 'suggestion',
-            rule: 'Specific Numbers Preferred',
-            matchedText: 'competitive price',
-            explanation: 'Replaced generic phrasing with explicit $155/sqft metric for institutional credibility.',
-          },
-        ],
+        issues: [],
       },
     },
     designConfigs: {
@@ -242,7 +225,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageId: 'phx-img-1',
         imageCropY: 50,
         imageZoom: 1.05,
-        activeMetricIds: ['purchase', 'reno', 'arv', 'spread', 'dom'],
+        activeMetricIds: ['purchase', 'reno', 'arv', 'spread'],
         customBadgeText: 'INVESTMENT MEMO',
         customCtaText: 'ACCESS DEAL ROOM',
         showDisclaimer: true,
@@ -257,7 +240,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageZoom: 1.1,
         activeMetricIds: ['purchase', 'reno', 'arv'],
         customBadgeText: 'UNDERWRITING BRIEF',
-        customCtaText: 'SWIPE UP / TAP FOR DECK',
+        customCtaText: 'VIEW DEAL DECK',
         showDisclaimer: false,
       },
       landscape: {
@@ -270,7 +253,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageZoom: 1.0,
         activeMetricIds: ['purchase', 'arv', 'spread'],
         customBadgeText: 'OPPORTUNITY BRIEF',
-        customCtaText: 'VIEW DEAL DETAILS',
+        customCtaText: 'VIEW DETAILS',
         showDisclaimer: true,
       },
       flyer_letter: {
@@ -281,7 +264,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageId: 'phx-img-1',
         imageCropY: 45,
         imageZoom: 1.0,
-        activeMetricIds: ['purchase', 'reno', 'arv', 'spread', 'sqft', 'roi'],
+        activeMetricIds: ['purchase', 'reno', 'all_in', 'arv', 'spread', 'sqft'],
         customBadgeText: 'CONFIDENTIAL DEAL BRIEF',
         customCtaText: 'CONTACT ACQUISITIONS TEAM',
         showDisclaimer: true,
@@ -294,7 +277,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageId: 'phx-img-1',
         imageCropY: 45,
         imageZoom: 1.0,
-        activeMetricIds: ['purchase', 'reno', 'arv', 'spread', 'sqft', 'roi'],
+        activeMetricIds: ['purchase', 'reno', 'all_in', 'arv', 'spread', 'sqft'],
         customBadgeText: 'CONFIDENTIAL DEAL BRIEF',
         customCtaText: 'CONTACT ACQUISITIONS TEAM',
         showDisclaimer: true,
@@ -305,9 +288,9 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
     id: 'campaign-dallas-multifamily',
     createdAt: '2026-08-12T11:00:00Z',
     updatedAt: '2026-08-17T16:00:00Z',
-    name: 'Dallas 8-Unit Multi-Family Cash Flow (9.4% Stabilized Cap)',
+    name: 'Demo · Dallas 8-Unit Multi-Family Cash Flow (9.4% Stabilized Cap)',
     status: 'completed',
-    tags: ['Multi-Family', 'Cash Flow', 'Dallas-Fort Worth', 'Syndication'],
+    tags: ['Demo', 'Fictional', 'Multi-Family', 'Cash Flow', 'Dallas-Fort Worth'],
     brandKitId: 'brand-default',
     sourceData: {
       campaignType: 'cash_flow_rental',
@@ -316,21 +299,21 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
       uploadedImages: [
         {
           id: 'dal-img-1',
-          url: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1600&q=80',
-          name: 'Multi-Family Exterior Elevation',
+          url: '/demo/multifamily-exterior.png',
+          name: 'Fictional Demo Multi-Family Exterior',
           source: 'sample',
           aspectRatio: 1.5,
           isHero: true,
-          altText: 'Boutique garden-style apartment building in Dallas',
+          altText: 'Boutique garden-style apartment building in Dallas with modern brick facade',
         },
         {
           id: 'dal-img-2',
-          url: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1600&q=80',
-          name: 'Sample Unit Interior',
+          url: '/demo/multifamily-interior.png',
+          name: 'Fictional Demo Unit Interior',
           source: 'sample',
           aspectRatio: 1.5,
           isHero: false,
-          altText: 'Modernized apartment living room with hardwood floors',
+          altText: 'Modernized apartment living room with hardwood floors and open kitchen',
         },
       ],
       selectedHeroImageId: 'dal-img-1',
@@ -349,19 +332,21 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         financials: {
           purchasePrice: 1150000,
           renovationEstimate: 96000,
+          inPlaceNOI: 78200,
+          stabilizedNOI: 108100,
           currentRentMonthly: 8400,
           projectedRentMonthly: 11200,
           capRatePercent: 9.4,
-          cashOnCashPercent: 12.8,
         },
-        investmentThesis: 'Acquire 8 two-bedroom units currently rented at $1,050/mo ($250/mo below market). Execute $12k/unit cosmetic modernization program upon natural lease roll. Stabilize at $1,400/mo to achieve 9.4% post-reno cap rate.',
+        investmentThesis: 'Acquire 8 two-bedroom units currently rented at $1,050/mo ($350/mo below market). Execute $12k/unit cosmetic modernization program upon natural lease roll. Stabilize at $1,400/mo to achieve 9.4% stabilized cap rate on acquisition basis (8.7% yield on total project cost).',
         dealHighlights: [
           '8 Units: All 2 Bed / 1 Bath layouts (800 sq ft each)',
-          'Purchase basis: $143,750 / door',
+          'Purchase basis: $143,750 / door ($179.69/SF)',
           'Current In-Place Gross: $100,800/yr ($1,050/unit)',
           'Stabilized Pro Forma Gross: $134,400/yr ($1,400/unit)',
-          'Projected stabilized cap rate: 9.4% on total basis',
+          'In-Place Cap: 6.8% | Stabilized Cap: 9.4% on purchase (8.7% yield on cost)',
         ],
+        notes: 'DEMO / FICTIONAL SAMPLE. 100% occupied garden apartments with individual meters.',
       },
     },
     strategy: {
@@ -374,7 +359,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         ],
         motivations: [
           'Sub-$150k per door entry basis in East Dallas',
-          'Clear $250–$350/mo rent gap to surrounding market comparables',
+          'Clear $350/mo rent gap to surrounding market comparables',
           'Strong 9.4% stabilized cap rate upon unit turnover',
         ],
       },
@@ -385,7 +370,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         'In-place 6.8% cap moving to 9.4% upon $12k/unit cosmetic turn',
         'Fully occupied with strong tenant payment history',
       ],
-      valueProposition: 'Boutique 8-unit multi-family property positioned for substantial cash-on-cash yield expansion via disciplined unit modernization.',
+      valueProposition: 'Boutique 8-unit multi-family property positioned for substantial yield expansion via disciplined unit modernization ($350/unit rent upside).',
       supportingEvidence: [
         'Surrounding renovated 2-beds achieving $1,450–$1,550/mo',
         'East Dallas submarket vacancy rate below 4.5%',
@@ -406,20 +391,20 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
       ],
       facebook: {
         headline: 'Dallas Multi-Family Opportunity: 8 Units with 9.4% Stabilized Cap',
-        body: 'New multi-family investment brief in East Dallas.\n\nProperty Overview:\n• 8 Units (all 2 Bed / 1 Bath, 800 SF)\n• Purchase Price: $1,150,000 ($143,750/door)\n• Current Rent: $1,050/unit ($8,400/mo total)\n• Market Comps: $1,400/unit ($11,200/mo total)\n• Capital Plan: $12,000/door cosmetic upgrade\n• Stabilized Yield: 9.4% Cap Rate\n\n100% occupied with low historical turnover. Ideal for 1031 exchange or passive portfolio expansion.',
+        body: 'New multi-family investment brief in East Dallas.\n\nProperty Overview:\n• 8 Units (all 2 Bed / 1 Bath, 800 SF)\n• Purchase Price: $1,150,000 ($143,750/door)\n• Current Rent: $1,050/unit ($8,400/mo total)\n• Market Comps: $1,400/unit ($11,200/mo total)\n• Capital Plan: $12,000/door cosmetic upgrade ($96,000 total)\n• In-Place Cap: 6.8% | Stabilized Cap: 9.4% on purchase (8.7% yield on total cost)\n\n100% occupied with low historical turnover. Ideal for 1031 exchange or private portfolio expansion.',
         cta: 'Message or comment "DALLAS" for the rent roll and pro forma model.',
         characterCount: 520,
       },
       instagram: {
         headline: '8-Unit East Dallas Multi-Family | 9.4% Cap Rate',
-        body: 'Deal Breakdown: Boutique 8-Unit Apartment in Dallas, TX\n\n🏢 8 Units (All 2 Bed / 1 Bath)\n📍 East Dallas / Lakewood Corridor\n💰 Purchase: $1,150,000 ($143K/Door)\n📊 Current Gross: $8,400/mo ($1,050/unit)\n📈 Market Potential: $11,200/mo ($1,400/unit)\n🛠 Value-Add Plan: $12K/unit interior refresh\n🎯 Projected Stabilized Cap: 9.4%\n\nSurrounding 2-bed units are leasing at $1,450–$1,550/mo. Clean mechanicals with individual HVAC and submetered electric.',
+        body: 'Deal Breakdown: Boutique 8-Unit Apartment in Dallas, TX\n\n🏢 8 Units (All 2 Bed / 1 Bath)\n📍 East Dallas / Lakewood Corridor\n💰 Purchase: $1,150,000 ($143K/Door)\n📊 Current Gross: $8,400/mo ($1,050/unit)\n📈 Market Potential: $11,200/mo ($1,400/unit)\n🛠 Value-Add Plan: $12K/unit interior refresh\n🎯 Projected Stabilized Cap: 9.4% (8.7% yield on cost)\n\nSurrounding 2-bed units are leasing at $1,450–$1,550/mo. Clean mechanicals with individual HVAC and submetered electric.',
         cta: 'Link in bio for rent roll and full deal memo.',
         hashtags: ['#DallasRealEstate', '#MultifamilyInvesting', '#CommercialRealEstate', '#CashFlow', '#ApartmentInvesting', '#TexasRealEstate'],
         characterCount: 590,
       },
       linkedin: {
         headline: 'Commercial Underwriting Brief: 8-Unit Value-Add Multi-Family | Dallas, TX',
-        body: 'Executive Summary:\n\nWe have underwritten an 8-unit boutique garden-style apartment community in the East Dallas submarket.\n\nKey Acquisition Metrics:\n• Purchase Price: $1,150,000 ($143,750 / unit | $179.68 / SF)\n• Total Unit Count: 8 identical 2 Bed / 1 Bath floorplans (800 SF avg)\n• In-Place NOI: $78,200 (6.8% in-place capitalization)\n• Projected Stabilized NOI: $108,100 (9.4% on cost)\n• Capital Improvement Budget: $96,000 ($12,000 / unit interior modernization)\n\nUnderwriting Thesis:\nCurrent rents average $1,050/mo, representing a ~$350/mo discount to renovated submarket comparables ($1,400–$1,450/mo). The property features pitched roofs, individual tenant-paid electric, and dedicated off-street parking.\n\nThis asset represents a high-probability yield optimization play suitable for private capital deployment or 1031 exchange replacement.',
+        body: 'Executive Summary:\n\nWe have underwritten an 8-unit boutique garden-style apartment community in the East Dallas submarket.\n\nKey Acquisition Metrics:\n• Purchase Price: $1,150,000 ($143,750 / unit | $179.69 / SF)\n• Total Unit Count: 8 identical 2 Bed / 1 Bath floorplans (800 SF avg)\n• In-Place NOI: $78,200 (6.80% in-place capitalization)\n• Projected Stabilized NOI: $108,100 (9.40% on purchase price | 8.68% yield on total project cost)\n• Capital Improvement Budget: $96,000 ($12,000 / unit interior modernization)\n\nUnderwriting Thesis:\nCurrent rents average $1,050/mo, representing a $350/mo discount to renovated submarket comparables ($1,400–$1,450/mo). The property features pitched roofs, individual tenant-paid electric, and dedicated off-street parking.\n\nThis asset represents a high-probability yield optimization play suitable for private capital deployment or 1031 exchange replacement.',
         cta: 'Contact directly for T-12 financials, trailing rent roll, and interactive underwriting model.',
         characterCount: 955,
       },
@@ -436,9 +421,10 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
 * **Purchase Price:** $1,150,000 ($143,750/unit)
 * **Current In-Place Rents:** $1,050/unit ($8,400/month)
 * **Pro Forma Stabilized Rents:** $1,400/unit ($11,200/month)
+* **Monthly Rent Upside:** $2,800/month ($33,600/year gross)
 * **Interior Renovation Plan:** $12,000/door ($96,000 total)
-* **Stabilized Cap Rate:** 9.4%
-* **Cash-on-Cash Return:** 12.8% (assuming 65% LTV leverage)
+* **In-Place Cap Rate:** 6.80%
+* **Stabilized Cap Rate:** 9.40% on purchase (8.68% yield on total project cost)
 
 #### Property Specifications
 * **Units:** 8 units (all 2 Bed / 1 Bath, ~800 SF)
@@ -448,7 +434,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
 
 #### Investment Highlights
 1. **Strong In-Place Occupancy:** Currently 100% occupied with zero delinquencies.
-2. **Clear Value-Add Path:** In-place rents are significantly trailing market comparables in East Dallas.
+2. **Clear Value-Add Path:** In-place rents are $350/unit below market comparables in East Dallas.
 3. **Low Maintenance Architecture:** Pitched composition shingle roof, individual HVAC split systems, separate electric meters.`,
         ctaButtonText: 'Access T-12, Rent Roll & Financial Model',
       },
@@ -469,7 +455,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
             timeframe: '0:05 - 0:25',
             visualDirection: 'Interior shot of current unit followed by comparison graphic.',
             spokenAudio: 'All 8 units are 2-bedroom, 1-bath layouts currently rented at $1,050 a month. But renovated 2-beds on this exact corridor are leasing for $1,400 to $1,500.',
-            onScreenText: 'Current Rent: $1,050/mo ➔ Comps: $1,450/mo',
+            onScreenText: 'Current Rent: $1,050/mo ➔ Comps: $1,400/mo (+$350/mo)',
           },
           {
             timeframe: '0:25 - 0:45',
@@ -502,7 +488,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageId: 'dal-img-1',
         imageCropY: 50,
         imageZoom: 1.0,
-        activeMetricIds: ['purchase', 'cap_rate', 'doors', 'cash_on_cash'],
+        activeMetricIds: ['purchase', 'doors', 'cap_rate', 'rent_upside'],
         customBadgeText: 'COMMERCIAL ACQUISITION',
         customCtaText: 'REQUEST RENT ROLL',
         showDisclaimer: true,
@@ -515,7 +501,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageId: 'dal-img-1',
         imageCropY: 45,
         imageZoom: 1.0,
-        activeMetricIds: ['purchase', 'doors', 'cap_rate', 'cash_on_cash', 'rent_upside'],
+        activeMetricIds: ['purchase', 'doors', 'cap_rate', 'rent_upside'],
         customBadgeText: 'INVESTMENT MEMO',
         customCtaText: 'DOWNLOAD PRO FORMA',
         showDisclaimer: true,
@@ -530,7 +516,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageZoom: 1.05,
         activeMetricIds: ['purchase', 'doors', 'cap_rate'],
         customBadgeText: 'COMMERCIAL DEAL BRIEF',
-        customCtaText: 'TAP TO VIEW RENT ROLL',
+        customCtaText: 'TAP FOR RENT ROLL',
         showDisclaimer: false,
       },
       landscape: {
@@ -554,7 +540,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageId: 'dal-img-1',
         imageCropY: 45,
         imageZoom: 1.0,
-        activeMetricIds: ['purchase', 'doors', 'cap_rate', 'cash_on_cash', 'sqft'],
+        activeMetricIds: ['purchase', 'doors', 'in_place_cap', 'cap_rate', 'rent_upside', 'sqft'],
         customBadgeText: 'CONFIDENTIAL OFFERING',
         customCtaText: 'REQUEST OFFERING MEMORANDUM',
         showDisclaimer: true,
@@ -567,7 +553,7 @@ To access the complete photo gallery, title commitments, and line-item scope, pl
         imageId: 'dal-img-1',
         imageCropY: 45,
         imageZoom: 1.0,
-        activeMetricIds: ['purchase', 'doors', 'cap_rate', 'cash_on_cash', 'sqft'],
+        activeMetricIds: ['purchase', 'doors', 'in_place_cap', 'cap_rate', 'rent_upside', 'sqft'],
         customBadgeText: 'CONFIDENTIAL OFFERING',
         customCtaText: 'REQUEST OFFERING MEMORANDUM',
         showDisclaimer: true,

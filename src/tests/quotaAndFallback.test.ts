@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { QuotaManager } from '../services/providers/quotaManager';
 import { UsageTracker } from '../services/providers/usageTracker';
-import { NvidiaImageProvider } from '../services/providers/nvidiaImageProvider';
-import { GeminiImageProvider } from '../services/providers/imageProvider';
+import { UploadOnlyProvider } from '../services/providers/imageProvider';
 import { MockAIProvider } from '../services/providers/mockProvider';
 import { CampaignSourceData } from '../types/campaign';
 import { BrandKit, DEFAULT_BRAND_KIT } from '../types/brandKit';
@@ -133,20 +132,11 @@ describe('Quota Manager, Error Classification & Fallback Engine', () => {
     expect(fullKit.metadata.actualModel).toBe('mock-provider');
   });
 
-  it('should fall back to curated authentic photography when NVIDIA is unconfigured', async () => {
-    const nvidia = new NvidiaImageProvider(undefined);
-    expect(nvidia.isConfigured()).toBe(false);
-
-    const image = await nvidia.generateConceptImage('modern apartment exterior', '1:1');
-    expect(image.url).toBeDefined();
-    expect(image.provider).toBe('authentic_curated_stock');
-    expect(image.isAiIllustrative).toBe(false);
-  });
-
-  it('should fall back to curated authentic photography when Gemini image has 0 quota or fails', async () => {
-    const geminiImg = new GeminiImageProvider('AIzaFakeKey');
-    const image = await geminiImg.generateConceptImage('luxury villa kitchen', '4:5');
-    expect(image.url).toBeDefined();
-    expect(image.provider).toBe('authentic_curated_stock');
+  it('returns an explicit deterministic demo fixture without calling a provider', async () => {
+    const fixtureProvider = new UploadOnlyProvider();
+    const image = await fixtureProvider.generateConceptImage('fictional villa kitchen', '4:5');
+    expect(image.url).toBe('/demo/fictional-property-exterior.png');
+    expect(image.provider).toBe('demo_fixture');
+    expect(image.metadata?.modelId).toBe('bundled-fictional-fixture');
   });
 });

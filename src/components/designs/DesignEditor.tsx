@@ -15,7 +15,8 @@ import {
   Check, 
   Sparkles,
   Maximize2,
-  FileText
+  FileText,
+  ShieldAlert
 } from 'lucide-react';
 
 interface DesignEditorProps {
@@ -32,6 +33,7 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
   const [activeFormat, setActiveFormat] = useState<OutputAspectRatio>('square');
   const [isExporting, setIsExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [showSafeZones, setShowSafeZones] = useState(false);
 
   const currentConfig = campaign.designConfigs[activeFormat] || {
     templateFamily: 'editorial',
@@ -61,15 +63,19 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
       const filename = `${campaign.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${activeFormat}`;
 
       if (activeFormat === 'flyer_letter' || activeFormat === 'flyer_a4') {
-        await PdfExporter.exportElementToPdf(elementId, `${filename}.pdf`);
+        await PdfExporter.exportElementToPdf(
+          elementId,
+          `${filename}.pdf`,
+          activeFormat === 'flyer_a4' ? 'a4' : 'letter'
+        );
       } else {
-        await GraphicExporter.exportToPng(elementId, `${filename}.png`, 2);
+        await GraphicExporter.exportToPng(elementId, `${filename}.png`);
       }
       setExportMessage('Export complete!');
       setTimeout(() => setExportMessage(null), 3000);
     } catch (err) {
       console.error('Export error', err);
-      setExportMessage('Export failed. Please try again.');
+      setExportMessage(`Export failed: ${err instanceof Error ? err.message : 'Please try again.'}`);
     } finally {
       setIsExporting(false);
     }
@@ -103,14 +109,30 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
           })}
         </div>
 
-        <button
-          onClick={handleExportSingle}
-          disabled={isExporting}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-colors disabled:opacity-50 shrink-0"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>{isExporting ? 'Generating...' : `Export ${isFlyer ? 'PDF' : 'High-Res PNG'}`}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {activeFormat === 'story' && (
+            <button
+              onClick={() => setShowSafeZones(!showSafeZones)}
+              className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 ${
+                showSafeZones
+                  ? 'bg-red-50 text-red-700 border-red-200'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>Safe Areas</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleExportSingle}
+            disabled={isExporting}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-colors disabled:opacity-50 shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{isExporting ? 'Generating...' : `Export ${isFlyer ? 'PDF' : 'High-Res PNG'}`}</span>
+          </button>
+        </div>
       </div>
 
       {exportMessage && (
@@ -327,12 +349,13 @@ export const DesignEditor: React.FC<DesignEditorProps> = ({
               aspectRatio={activeFormat}
               configOverride={currentConfig}
               brandKit={brandKit}
+              showSafeZones={showSafeZones}
               className="rounded-lg shadow-elevated"
             />
           </div>
 
           <p className="text-[11px] text-slate-400 text-center mt-3 max-w-md">
-            All text remains live rendered vector typography. Exporting outputs crisp high-resolution 300 DPI graphics or PDF flyers without loss of clarity.
+            Social graphics export at their exact declared pixel dimensions. Flyers export as high-resolution raster PDFs at the correct physical page size.
           </p>
         </div>
       </div>

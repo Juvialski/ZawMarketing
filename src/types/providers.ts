@@ -85,10 +85,10 @@ export interface AIUsageRecord {
 
 export type ImageQualityTier = 
   | 'free_dev'          // Free: NVIDIA / Curated Uploads
-  | 'paid_standard'      // Paid: FLUX.2 Pro (~$0.05)
-  | 'paid_maximum'       // Paid: FLUX.2 Max (~$0.08) - Maximum Quality
-  | 'paid_specialized'   // Paid: FLUX.2 Flex (~$0.06) - Fine visual/text control
-  | 'paid_alternate'     // Paid: Gemini Nano Banana Pro (~$0.04)
+  | 'paid_standard'      // Paid: server-priced production model
+  | 'paid_maximum'       // Paid: server-priced maximum-quality model
+  | 'paid_specialized'   // Paid: server-priced fine-control model
+  | 'paid_alternate'     // Paid: server-verified alternate model
   | 'auto';              // Auto-routes based on purpose (never exceeds budget)
 
 export type ImagePurpose = 
@@ -157,8 +157,9 @@ export interface ImageProviderDefinition {
 }
 
 export interface ProviderConfig {
+  /** Client execution mode; live providers are backend-only. */
+  runtimeMode?: 'demo' | 'live';
   aiProvider: AIProviderType;
-  geminiApiKey?: string;
   geminiModel: string; // legacy alias for defaultModelId
   defaultModelId: string;
   fallbackModelId: string;
@@ -171,14 +172,8 @@ export interface ProviderConfig {
   imageQualityTier: ImageQualityTier;
   geminiImageModel: string;
   geminiImageQuotaAvailable: boolean;
-  nvidiaApiKey?: string;
-  nvidiaBaseUrl?: string;
   nvidiaModelId: string;
-  bflApiKey?: string;
-  bflBaseUrl?: string;
   bflModelId?: string;
-  openaiApiKey?: string;
-  openaiBaseUrl?: string;
   openaiImageModel?: string;
   imageSpendingLimits: ImageSpendingLimits;
 
@@ -195,6 +190,10 @@ export interface GenerationOptions {
   thinkingLevel?: ThinkingLevel;
   operation?: AIOperationType;
   skipFallback?: boolean;
+  /** Authenticated tenant context required by live Edge operations. */
+  organizationId?: string;
+  campaignId?: string;
+  runtimeMode?: 'demo' | 'live';
 }
 
 export interface FullKitGenerationResult {
@@ -244,6 +243,9 @@ export interface GeneratedImageResult {
   altText: string;
   isAiIllustrative: boolean;
   provider: string;
+  provenance?: 'generated' | 'uploaded' | 'fixture' | 'fallback' | 'failed';
+  storageBucket?: string;
+  storagePath?: string;
   costMetadata?: ImageCostMetadata;
   metadata?: {
     modelId?: string;

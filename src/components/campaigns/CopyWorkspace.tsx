@@ -19,6 +19,8 @@ import {
 interface CopyWorkspaceProps {
   campaign: Campaign;
   brandKit: BrandKit;
+  organizationId?: string;
+  runtimeMode: 'demo' | 'live';
   onSaveCopy: (copy: CampaignCopy) => void;
 }
 
@@ -27,6 +29,8 @@ type PlatformTab = 'linkedin' | 'instagram' | 'facebook' | 'email' | 'video' | '
 export const CopyWorkspace: React.FC<CopyWorkspaceProps> = ({
   campaign,
   brandKit,
+  organizationId,
+  runtimeMode,
   onSaveCopy,
 }) => {
   const [activeTab, setActiveTab] = useState<PlatformTab>('linkedin');
@@ -50,7 +54,8 @@ export const CopyWorkspace: React.FC<CopyWorkspaceProps> = ({
         campaign.sourceData,
         campaign.strategy,
         brandKit,
-        (step) => setProgressMsg(step)
+        (step) => setProgressMsg(step),
+        { organizationId, campaignId: campaign.id, runtimeMode }
       );
       setCopy(generated);
       onSaveCopy(generated);

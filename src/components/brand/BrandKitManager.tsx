@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BrandKit, DEFAULT_BRAND_KIT, TypographyFamily } from '../../types/brandKit';
+import { BrandKit, TypographyFamily } from '../../types/brandKit';
+import { createNeutralBrandKit } from '../../services/storage/brandKitStore';
 import { 
   Palette, 
   Type, 
@@ -62,9 +63,10 @@ export const BrandKitManager: React.FC<BrandKitManagerProps> = ({
   };
 
   const handleReset = () => {
-    if (confirm('Reset brand kit to institutional defaults?')) {
-      setFormData(DEFAULT_BRAND_KIT);
-      onSaveBrandKit(DEFAULT_BRAND_KIT);
+    if (confirm('Clear optional brand identity fields and restore neutral style defaults?')) {
+      const neutral = createNeutralBrandKit();
+      setFormData(neutral);
+      onSaveBrandKit(neutral);
     }
   };
 
@@ -91,7 +93,7 @@ export const BrandKitManager: React.FC<BrandKitManagerProps> = ({
             className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Defaults</span>
+            <span>Clear to Neutral</span>
           </button>
 
           <button

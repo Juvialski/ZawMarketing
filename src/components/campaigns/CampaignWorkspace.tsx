@@ -19,6 +19,8 @@ import {
 interface CampaignWorkspaceProps {
   campaign: Campaign;
   brandKit: BrandKit;
+  organizationId?: string;
+  runtimeMode: 'demo' | 'live';
   onUpdateCampaign: (campaign: Campaign) => void;
   onBack: () => void;
 }
@@ -28,6 +30,8 @@ type WorkspaceTab = 'kit' | 'strategy' | 'copy' | 'designs' | 'intake';
 export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
   campaign,
   brandKit,
+  organizationId,
+  runtimeMode,
   onUpdateCampaign,
   onBack,
 }) => {
@@ -79,6 +83,7 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
+            aria-label="Back to campaign library"
             className="p-2 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -100,7 +105,7 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center bg-white p-1 rounded-xl border border-slate-200 shadow-subtle">
+        <div className="flex max-w-full overflow-x-auto items-center bg-white p-1 rounded-xl border border-slate-200 shadow-subtle">
           {[
             { id: 'kit', label: 'Full Marketing Kit', icon: Package },
             { id: 'strategy', label: 'Strategy', icon: Compass },
@@ -114,7 +119,7 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as WorkspaceTab)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                className={`shrink-0 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
                   isActive
                     ? 'bg-slate-900 text-white shadow-sm'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -134,6 +139,8 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
           <FullMarketingKitView
             campaign={campaign}
             brandKit={brandKit}
+            organizationId={organizationId}
+            runtimeMode={runtimeMode}
             onUpdateCampaign={onUpdateCampaign}
           />
         )}
@@ -142,6 +149,8 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
           <StrategyWorkspace
             campaign={campaign}
             brandKit={brandKit}
+            organizationId={organizationId}
+            runtimeMode={runtimeMode}
             onSaveStrategy={handleSaveStrategy}
             onProceedToCopy={() => setActiveTab('copy')}
           />
@@ -151,6 +160,8 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
           <CopyWorkspace
             campaign={campaign}
             brandKit={brandKit}
+            organizationId={organizationId}
+            runtimeMode={runtimeMode}
             onSaveCopy={handleSaveCopy}
           />
         )}
@@ -166,6 +177,9 @@ export const CampaignWorkspace: React.FC<CampaignWorkspaceProps> = ({
         {activeTab === 'intake' && (
           <SourceIntakeForm
             initialData={campaign.sourceData}
+            organizationId={organizationId}
+            campaignId={campaign.id}
+            runtimeMode={runtimeMode}
             onSave={handleSaveSource}
           />
         )}

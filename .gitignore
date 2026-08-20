@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+client-demo-output/
 
 # Editor directories and files
 .vscode/*
@@ -27,3 +28,10 @@ dist-ssr
 .env
 .env.local
 .env.production
+
+# Temporary & test output
+test-results/
+tmp/
+supabase/.branches/
+supabase/.temp/
+

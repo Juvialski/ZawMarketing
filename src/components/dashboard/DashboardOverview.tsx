@@ -72,7 +72,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       {/* 2. Key Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-subtle space-y-1">
-          <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold">
+          <span className="text-[10px] font-mono uppercase text-slate-600 block font-semibold">
             Active Campaigns
           </span>
           <div className="text-2xl font-black font-mono text-slate-900">{campaigns.length}</div>
@@ -80,7 +80,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-subtle space-y-1">
-          <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold">
+          <span className="text-[10px] font-mono uppercase text-slate-600 block font-semibold">
             Underwritten Volume
           </span>
           <div className="text-2xl font-black font-mono text-slate-900">{formatCurrency(totalVolume)}</div>
@@ -88,7 +88,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-subtle space-y-1">
-          <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold">
+          <span className="text-[10px] font-mono uppercase text-slate-600 block font-semibold">
             Identified Equity Spread
           </span>
           <div className="text-2xl font-black font-mono text-emerald-600">
@@ -98,7 +98,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-subtle space-y-1">
-          <span className="text-[10px] font-mono uppercase text-slate-400 block font-semibold">
+          <span className="text-[10px] font-mono uppercase text-slate-600 block font-semibold">
             Anti-Slop Compliance
           </span>
           <div className="text-2xl font-black font-mono text-amber-600">98/100</div>
@@ -213,7 +213,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   <span className="text-[9px] font-mono uppercase text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-bold">
                     {c.sourceData.campaignType.replace(/_/g, ' ')}
                   </span>
-                  <h4 className="text-xs font-bold text-slate-900 truncate mt-1">{c.name}</h4>
+                  <h3 className="text-xs font-bold text-slate-900 truncate mt-1">{c.name}</h3>
                   <p className="text-[11px] text-slate-500 truncate mt-0.5">{c.sourceData.targetMarket}</p>
                 </div>
 

@@ -21,12 +21,16 @@ import {
 interface FullMarketingKitViewProps {
   campaign: Campaign;
   brandKit: BrandKit;
+  organizationId?: string;
+  runtimeMode: 'demo' | 'live';
   onUpdateCampaign: (updated: Campaign) => void;
 }
 
 export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
   campaign,
   brandKit,
+  organizationId,
+  runtimeMode,
   onUpdateCampaign,
 }) => {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -55,7 +59,8 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
         (step, pct) => {
           setCurrentStepName(step);
           setProgressPercent(pct);
-        }
+        },
+        { organizationId, campaignId: campaign.id, runtimeMode }
       );
 
       if (result.metadata.fallbackOccurred) {
@@ -97,7 +102,7 @@ export const FullMarketingKitView: React.FC<FullMarketingKitViewProps> = ({
         campaign.copy,
         campaign.sourceData,
         brandKit,
-        { modelId: premiumModelId }
+        { modelId: premiumModelId, organizationId, campaignId: campaign.id, runtimeMode }
       );
 
       const updatedCopy = {

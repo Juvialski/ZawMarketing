@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AuthService } from '../../services/supabase/authService';
-import { SUPABASE_URL } from '../../services/supabase/client';
+import { SUPABASE_URL, isSupabaseConfigured } from '../../services/supabase/client';
 import { Lock, Mail, User as UserIcon, Building2, Check, X, ShieldCheck } from 'lucide-react';
 
 interface AuthModalProps {
@@ -34,8 +34,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const { error } = await AuthService.signUp(
           email,
           password,
-          displayName || 'Acquisitions Associate',
-          companyName || 'Apex Capital & Acquisitions'
+          displayName.trim(),
+          companyName.trim()
         );
         if (error) throw error;
       } else {
@@ -45,24 +45,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       onAuthSuccess();
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Authentication failed. Please check your credentials.');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Authentication failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDemoLogin = () => {
+    if (isSupabaseConfigured()) {
+      setErrorMsg('Demo workspace is available only when the live backend is unconfigured.');
+      return;
+    }
     onAuthSuccess();
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 sm:p-8 relative space-y-6 animate-in fade-in zoom-in-95 duration-200">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-dialog-title"
+        className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 sm:p-8 relative space-y-6 animate-in fade-in zoom-in-95 duration-200"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
+          aria-label="Close authentication dialog"
           className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
         >
           <X className="w-4 h-4" />
@@ -75,11 +85,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               SUPABASE AUTHENTICATION
             </span>
           </div>
-          <h2 className="text-xl font-serif font-bold text-slate-900 mt-2">
+          <h2 id="auth-dialog-title" className="text-xl font-serif font-bold text-slate-900 mt-2">
             {isSignUp ? 'Create Workspace Account' : 'Sign In to Studio Workspace'}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Connected to dedicated Supabase project: <span className="font-mono text-slate-700 font-semibold">{SUPABASE_URL.replace('https://', '')}</span>
+            {isSupabaseConfigured()
+              ? <>Connected to dedicated Supabase project: <span className="font-mono text-slate-700 font-semibold">{SUPABASE_URL.replace('https://', '')}</span></>
+              : 'Live backend is not configured; you can launch the explicitly labeled demo workspace.'}
           </p>
         </div>
 
@@ -95,14 +107,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </span>
           </div>
           <p className="text-xs text-amber-800 leading-relaxed">
-            Instantly launch the pre-seeded Apex Capital institutional workspace with full campaigns and brand kit.
+            Launch the clearly labeled fictional fixture workspace. It is never used for authenticated live data.
           </p>
           <button
             type="button"
             onClick={handleDemoLogin}
+            disabled={isSupabaseConfigured()}
+            aria-disabled={isSupabaseConfigured()}
             className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm transition-colors"
           >
-            Launch Apex Capital Demo Workspace
+            Launch Fictional Demo Workspace
           </button>
         </div>
 
@@ -125,7 +139,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g. Al Acquisitions"
+                    placeholder="e.g. Your Name"
                     className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl"
                   />
                 </div>
@@ -140,7 +154,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="e.g. Apex Capital Partners"
+                    placeholder="e.g. Your Firm"
                     className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl"
                   />
                 </div>

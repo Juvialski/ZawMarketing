@@ -3,89 +3,107 @@ import { SAMPLE_CAMPAIGNS } from '../../data/sampleCampaigns';
 
 const STORAGE_KEY = 'zaw_marketing_campaigns_v1';
 
+export interface LocalStoreOptions {
+  /** Fictional fixtures are only allowed when the caller explicitly opts in. */
+  allowDemoFixtures?: boolean;
+}
+
+const getLocalStorage = (): Storage | null => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+    if (typeof localStorage !== 'undefined') return localStorage;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const localId = (): string => {
+  const cryptoObject = typeof globalThis.crypto !== 'undefined' ? globalThis.crypto : undefined;
+  if (cryptoObject?.randomUUID) return `demo-${cryptoObject.randomUUID()}`;
+  return `demo-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 export class CampaignStore {
-  private static getInitialCampaigns(): Campaign[] {
+  private static read(): Campaign[] | null {
+    const storage = getLocalStorage();
+    if (!storage) return null;
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load campaigns from localStorage, using samples', e);
+      const stored = storage.getItem(STORAGE_KEY);
+      if (!stored) return null;
+      const parsed: unknown = JSON.parse(stored);
+      return Array.isArray(parsed) ? (parsed as Campaign[]) : null;
+    } catch (error) {
+      console.warn('Failed to load local campaign cache', error);
+      return null;
     }
-    // Initialize with sample campaigns
-    this.saveToStorage(SAMPLE_CAMPAIGNS);
-    return SAMPLE_CAMPAIGNS;
   }
 
   private static saveToStorage(campaigns: Campaign[]): void {
+    const storage = getLocalStorage();
+    if (!storage) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(campaigns));
-    } catch (e) {
-      console.error('Failed to save campaigns to localStorage', e);
+      storage.setItem(STORAGE_KEY, JSON.stringify(campaigns));
+    } catch (error) {
+      console.error('Failed to save local campaign cache', error);
     }
   }
 
-  public static getAll(): Campaign[] {
-    return this.getInitialCampaigns();
+  public static getAll(options: LocalStoreOptions = {}): Campaign[] {
+    const campaigns = this.read();
+    if (campaigns) return clone(campaigns);
+    return options.allowDemoFixtures ? clone(SAMPLE_CAMPAIGNS) : [];
   }
 
-  public static getById(id: string): Campaign | undefined {
-    const campaigns = this.getAll();
-    return campaigns.find((c) => c.id === id);
+  public static getById(id: string, options: LocalStoreOptions = {}): Campaign | undefined {
+    return this.getAll(options).find((campaign) => campaign.id === id);
   }
 
-  public static save(campaign: Campaign): Campaign {
-    const campaigns = this.getAll();
-    const index = campaigns.findIndex((c) => c.id === campaign.id);
-    const updated = {
-      ...campaign,
+  public static save(campaign: Campaign, options: LocalStoreOptions = {}): Campaign {
+    const campaigns = this.getAll(options);
+    const index = campaigns.findIndex((item) => item.id === campaign.id);
+    const updated: Campaign = {
+      ...clone(campaign),
       updatedAt: new Date().toISOString(),
     };
 
-    if (index >= 0) {
-      campaigns[index] = updated;
-    } else {
-      campaigns.unshift(updated);
-    }
-
+    if (index >= 0) campaigns[index] = updated;
+    else campaigns.unshift(updated);
     this.saveToStorage(campaigns);
-    return updated;
+    return clone(updated);
   }
 
   public static duplicate(id: string): Campaign | null {
     const campaign = this.getById(id);
     if (!campaign) return null;
 
-    const newId = `campaign-${Date.now()}`;
+    const now = new Date().toISOString();
     const duplicated: Campaign = {
-      ...JSON.parse(JSON.stringify(campaign)),
-      id: newId,
+      ...clone(campaign),
+      id: localId(),
       name: `${campaign.name} (Copy)`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
 
-    this.save(duplicated);
-    return duplicated;
+    return this.save(duplicated, { allowDemoFixtures: true });
   }
 
   public static delete(id: string): boolean {
     const campaigns = this.getAll();
-    const filtered = campaigns.filter((c) => c.id !== id);
-    if (filtered.length !== campaigns.length) {
-      this.saveToStorage(filtered);
-      return true;
-    }
-    return false;
+    const filtered = campaigns.filter((campaign) => campaign.id !== id);
+    if (filtered.length === campaigns.length) return false;
+    this.saveToStorage(filtered);
+    return true;
   }
 
+  /** Explicit user action to restore the clearly fictional demo workspace. */
   public static resetToSamples(): Campaign[] {
-    this.saveToStorage(SAMPLE_CAMPAIGNS);
-    return SAMPLE_CAMPAIGNS;
+    const samples = clone(SAMPLE_CAMPAIGNS);
+    this.saveToStorage(samples);
+    return samples;
   }
 
   public static createDefaultDesignConfigs(): Record<OutputAspectRatio, GraphicDesignConfig> {

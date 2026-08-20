@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ImageSpendingTracker } from '../services/providers/imageSpendingTracker';
-import { BflImageProvider } from '../services/providers/bflImageProvider';
-import { GeminiPaidImageProvider } from '../services/providers/geminiImageProvider';
+import { UploadOnlyProvider } from '../services/providers/imageProvider';
 import { ImageSpendingLimits, ImageCreativeBrief } from '../types/providers';
 
 describe('Image Cost Safety, Budget Limits & Fallback Guards', () => {
@@ -76,10 +75,8 @@ describe('Image Cost Safety, Budget Limits & Fallback Guards', () => {
     expect(check.reason).toContain('Maximum images per campaign limit (3) reached');
   });
 
-  it('should fall back to curated photography fixture when BFL API key is unconfigured', async () => {
-    const unconfiguredBfl = new BflImageProvider(undefined);
-    expect(unconfiguredBfl.isConfigured()).toBe(false);
-
+  it('uses an explicitly fictional bundled fixture in demo mode', async () => {
+    const demoProvider = new UploadOnlyProvider();
     const brief: ImageCreativeBrief = {
       purpose: 'hero',
       subject: 'Modern architectural home in Phoenix',
@@ -87,17 +84,16 @@ describe('Image Cost Safety, Budget Limits & Fallback Guards', () => {
       qualityTier: 'paid_maximum',
     };
 
-    const result = await unconfiguredBfl.generateFromBrief(brief);
-    expect(result.url).toBeDefined();
-    expect(result.provider).toBe('authentic_curated_stock');
-    expect(result.isAiIllustrative).toBe(false);
+    const result = await demoProvider.generateFromBrief(brief);
+    expect(result.url).toBe('/demo/fictional-property-exterior.png');
+    expect(result.provider).toBe('demo_fixture');
+    expect(result.altText).toContain('not a real listing');
+    expect(result.isAiIllustrative).toBe(true);
     expect(result.metadata?.estimatedCostUsd).toBe(0.0);
   });
 
-  it('should fall back to curated photography fixture when Gemini image key is unconfigured', async () => {
-    const unconfiguredGemini = new GeminiPaidImageProvider(undefined);
-    expect(unconfiguredGemini.isConfigured()).toBe(false);
-
+  it('chooses the deterministic interior fixture for supporting demo visuals', async () => {
+    const demoProvider = new UploadOnlyProvider();
     const brief: ImageCreativeBrief = {
       purpose: 'supporting',
       subject: 'Kitchen island and quartz counter',
@@ -105,9 +101,9 @@ describe('Image Cost Safety, Budget Limits & Fallback Guards', () => {
       qualityTier: 'paid_alternate',
     };
 
-    const result = await unconfiguredGemini.generateFromBrief(brief);
-    expect(result.url).toBeDefined();
-    expect(result.provider).toBe('authentic_curated_stock');
+    const result = await demoProvider.generateFromBrief(brief);
+    expect(result.url).toBe('/demo/fictional-property-interior.png');
+    expect(result.provider).toBe('demo_fixture');
     expect(result.metadata?.estimatedCostUsd).toBe(0.0);
   });
 });

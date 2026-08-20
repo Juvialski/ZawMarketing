@@ -18,62 +18,41 @@ interface SourceIntakeFormProps {
   initialData?: Partial<CampaignSourceData>;
   organizationId?: string;
   campaignId?: string;
+  runtimeMode?: 'demo' | 'live';
   onSave: (data: CampaignSourceData) => void;
   onCancel?: () => void;
 }
 
 export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
   initialData,
-  organizationId = 'a0000000-0000-0000-0000-000000000001',
-  campaignId = 'temp-campaign',
+  organizationId = 'demo-local',
+  campaignId = 'demo-draft',
+  runtimeMode = 'demo',
   onSave,
   onCancel,
 }) => {
   const [campaignType, setCampaignType] = useState<CampaignType>(initialData?.campaignType || 'fix_and_flip');
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [title, setTitle] = useState(initialData?.title || '');
-  const [targetMarket, setTargetMarket] = useState(initialData?.targetMarket || 'Phoenix, AZ');
+  const [targetMarket, setTargetMarket] = useState(initialData?.targetMarket || '');
   const [address, setAddress] = useState(initialData?.property?.address || '');
-  const [city, setCity] = useState(initialData?.property?.city || 'Phoenix');
-  const [state, setState] = useState(initialData?.property?.state || 'AZ');
+  const [city, setCity] = useState(initialData?.property?.city || '');
+  const [state, setState] = useState(initialData?.property?.state || '');
   const [zipCode, setZipCode] = useState(initialData?.property?.zipCode || '');
   const [neighborhood, setNeighborhood] = useState(initialData?.property?.neighborhood || '');
-  const [bedrooms, setBedrooms] = useState<number | ''>(initialData?.property?.bedrooms || 3);
-  const [bathrooms, setBathrooms] = useState<number | ''>(initialData?.property?.bathrooms || 2);
-  const [squareFeet, setSquareFeet] = useState<number | ''>(initialData?.property?.squareFeet || 1840);
-  const [purchasePrice, setPurchasePrice] = useState<number | ''>(initialData?.property?.financials.purchasePrice || 285000);
-  const [renovationEstimate, setRenovationEstimate] = useState<number | ''>(initialData?.property?.financials.renovationEstimate || 35000);
-  const [arv, setArv] = useState<number | ''>(initialData?.property?.financials.arv || 390000);
+  const [bedrooms, setBedrooms] = useState<number | ''>(initialData?.property?.bedrooms || '');
+  const [bathrooms, setBathrooms] = useState<number | ''>(initialData?.property?.bathrooms || '');
+  const [squareFeet, setSquareFeet] = useState<number | ''>(initialData?.property?.squareFeet || '');
+  const [purchasePrice, setPurchasePrice] = useState<number | ''>(initialData?.property?.financials.purchasePrice || '');
+  const [renovationEstimate, setRenovationEstimate] = useState<number | ''>(initialData?.property?.financials.renovationEstimate || '');
+  const [arv, setArv] = useState<number | ''>(initialData?.property?.financials.arv || '');
   const [projectedRent, setProjectedRent] = useState<number | ''>(initialData?.property?.financials.projectedRentMonthly || '');
   const [capRate, setCapRate] = useState<number | ''>(initialData?.property?.financials.capRatePercent || '');
-  const [investmentThesis, setInvestmentThesis] = useState(
-    initialData?.property?.investmentThesis ||
-      'Acquisition of an off-market value-add single family home in a high-demand submarket. Light cosmetic renovation budget to modernize kitchen and baths for rapid resale.'
-  );
+  const [investmentThesis, setInvestmentThesis] = useState(initialData?.property?.investmentThesis || '');
   const [dealHighlights, setDealHighlights] = useState(
-    initialData?.property?.dealHighlights?.join('\n') ||
-      'Purchase basis: $285,000 ($155/sqft)\nEstimated cosmetic renovation: $35,000\nConservative ARV: $390,000 with comps support'
+    initialData?.property?.dealHighlights?.join('\n') || ''
   );
-  const [uploadedImages, setUploadedImages] = useState<CampaignImage[]>(
-    initialData?.uploadedImages || [
-      {
-        id: 'img-default-1',
-        url: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=1600&q=80',
-        name: 'Front Elevation',
-        source: 'sample',
-        aspectRatio: 1.5,
-        isHero: true,
-      },
-      {
-        id: 'img-default-2',
-        url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=80',
-        name: 'Living & Kitchen',
-        source: 'sample',
-        aspectRatio: 1.5,
-        isHero: false,
-      },
-    ]
-  );
+  const [uploadedImages, setUploadedImages] = useState<CampaignImage[]>(initialData?.uploadedImages || []);
   const [isUploading, setIsUploading] = useState(false);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,7 +62,7 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
     setIsUploading(true);
     try {
       for (const file of Array.from(files)) {
-        const { publicUrl } = await StorageService.uploadPropertyPhoto(
+        const asset = await StorageService.uploadPropertyPhoto(
           organizationId,
           campaignId,
           file
@@ -91,11 +70,14 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
 
         const newImg: CampaignImage = {
           id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          url: publicUrl,
+          url: asset.url,
           name: file.name,
           source: 'upload',
           aspectRatio: 1.5,
           isHero: uploadedImages.length === 0,
+          provenance: 'uploaded',
+          storageBucket: asset.bucket,
+          storagePath: asset.path,
         };
 
         setUploadedImages((prev) => [...prev, newImg]);
@@ -107,7 +89,7 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
     }
   };
 
-  const handleSelectCuratedStock = (photo: typeof CURATED_STOCK_PHOTOS[0]) => {
+  const handleSelectCuratedStock = (photo: (typeof CURATED_STOCK_PHOTOS)[number]) => {
     const newImg: CampaignImage = {
       id: `stock-${Date.now()}`,
       url: photo.url,
@@ -147,7 +129,7 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
       uploadedImages,
       selectedHeroImageId: uploadedImages.find((img) => img.isHero)?.id || uploadedImages[0]?.id,
       property: {
-        address: address || '100 Main St',
+        address,
         city,
         state,
         zipCode: zipCode || undefined,
@@ -216,8 +198,9 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
       {/* 2. Core Location & Title */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="sm:col-span-2">
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Campaign Working Title</label>
+          <label htmlFor="campaign-working-title" className="block text-xs font-semibold text-slate-700 mb-1">Campaign Working Title</label>
           <input
+            id="campaign-working-title"
             type="text"
             required
             value={title}
@@ -422,7 +405,7 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-slate-600" />
-            Property Photography (Supabase Storage)
+            {runtimeMode === 'live' ? 'Property Photography (Private Storage)' : 'Demo Photography (Local Only)'}
           </h3>
           <span className="text-[11px] text-slate-500">{uploadedImages.length} photos ready</span>
         </div>
@@ -431,7 +414,7 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
         <div className="flex flex-wrap items-center gap-3">
           <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors">
             {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            <span>{isUploading ? 'Uploading to Storage...' : 'Upload Photos (Supabase)'}</span>
+            <span>{isUploading ? 'Preparing photo...' : runtimeMode === 'live' ? 'Upload to Private Storage' : 'Add Local Demo Photo'}</span>
             <input type="file" multiple accept="image/*" onChange={handleImageUpload} disabled={isUploading} className="hidden" />
           </label>
 
@@ -444,19 +427,23 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
             <span>Generate AI Concept Visual</span>
           </button>
 
-          <span className="text-xs text-slate-400">or add curated stock:</span>
-          <div className="flex gap-1.5 overflow-x-auto py-1">
-            {CURATED_STOCK_PHOTOS.slice(0, 3).map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => handleSelectCuratedStock(p)}
-                className="px-2 py-1 bg-white border border-slate-300 hover:border-slate-400 rounded text-[10px] text-slate-600 truncate max-w-[120px]"
-              >
-                + {p.name}
-              </button>
-            ))}
-          </div>
+          {runtimeMode === 'demo' && (
+            <>
+              <span className="text-xs text-slate-400">or add a fictional bundled fixture:</span>
+              <div className="flex gap-1.5 overflow-x-auto py-1">
+                {CURATED_STOCK_PHOTOS.map((photo) => (
+                  <button
+                    key={photo.id}
+                    type="button"
+                    onClick={() => handleSelectCuratedStock(photo)}
+                    className="px-2 py-1 bg-white border border-slate-300 hover:border-slate-400 rounded text-[10px] text-slate-600 truncate max-w-[180px]"
+                  >
+                    + {photo.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Image Grid Preview */}
@@ -480,6 +467,7 @@ export const SourceIntakeForm: React.FC<SourceIntakeFormProps> = ({
                 <button
                   type="button"
                   onClick={() => removeImage(img.id)}
+                  aria-label={`Remove ${img.name}`}
                   className="p-1 bg-red-600 text-white rounded self-end hover:bg-red-700"
                 >
                   <Trash2 className="w-3 h-3" />

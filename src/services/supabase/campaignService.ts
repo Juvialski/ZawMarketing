@@ -1,102 +1,253 @@
 import { supabase, isSupabaseConfigured } from './client';
-import { Campaign, CampaignCopy, CampaignSourceData, CampaignStrategy, GraphicDesignConfig, OutputAspectRatio } from '../../types/campaign';
+import {
+  Campaign,
+  CampaignCopy,
+  CampaignSourceData,
+  CampaignStrategy,
+  GraphicDesignConfig,
+  OutputAspectRatio,
+} from '../../types/campaign';
 import { CampaignStore } from '../storage/campaignStore';
+import { Database, Json } from '../../types/database.types';
+import { ServiceError } from './serviceError';
+import { StorageBucket, StorageService } from './storageService';
+
+type CampaignRow = Database['public']['Tables']['campaigns']['Row'];
+type CampaignInsert = Database['public']['Tables']['campaigns']['Insert'];
+type CampaignUpdate = Database['public']['Tables']['campaigns']['Update'];
+type CampaignContentInsert = Database['public']['Tables']['campaign_content']['Insert'];
+type CampaignContentRow = Database['public']['Tables']['campaign_content']['Row'];
+
+interface CampaignQueryRow extends CampaignRow {
+  campaign_content?: CampaignContentRow[] | null;
+}
+
+const localId = (): string => {
+  const cryptoObject = typeof globalThis.crypto !== 'undefined' ? globalThis.crypto : undefined;
+  if (cryptoObject?.randomUUID) return `demo-${cryptoObject.randomUUID()}`;
+  return `demo-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const asJson = (value: unknown): Json => value as Json;
+
+const toPayload = (
+  organizationId: string,
+  campaign: Campaign,
+  userId?: string
+): CampaignInsert => ({
+  organization_id: organizationId,
+  created_by: userId || null,
+  name: campaign.name,
+  campaign_type: campaign.sourceData.campaignType,
+  target_market: campaign.sourceData.targetMarket,
+  status: campaign.status,
+  source_data: asJson(campaign.sourceData),
+  strategy: campaign.strategy ? asJson(campaign.strategy) : null,
+  design_configs: asJson(campaign.designConfigs),
+  tags: campaign.tags || [],
+});
+
+const toUpdatePayload = (
+  organizationId: string,
+  campaign: Campaign,
+  userId?: string
+): CampaignUpdate => {
+  const payload = toPayload(organizationId, campaign, userId);
+  const { organization_id: _organizationId, ...updates } = payload;
+  return updates;
+};
+
+const mapRowToCampaign = (row: CampaignQueryRow): Campaign => {
+  const copyContent = row.campaign_content?.find((content) => content.content_type === 'all_package');
+  const copy = copyContent?.content as unknown as CampaignCopy | undefined;
+
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    status: row.status,
+    sourceData: row.source_data as unknown as CampaignSourceData,
+    strategy: row.strategy as unknown as CampaignStrategy | undefined,
+    copy,
+    designConfigs: row.design_configs as unknown as Record<OutputAspectRatio, GraphicDesignConfig>,
+    tags: row.tags || [],
+  };
+};
+
+const hydrateSignedAssetUrls = async (campaign: Campaign): Promise<Campaign> => {
+  const uploadedImages = await Promise.all(
+    campaign.sourceData.uploadedImages.map(async (image) => {
+      if (!image.storageBucket || !image.storagePath) return image;
+      try {
+        const url = await StorageService.getSignedUrl(
+          image.storageBucket as StorageBucket,
+          image.storagePath
+        );
+        return { ...image, url };
+      } catch {
+        // Preserve canonical identity and let the UI show its normal broken/
+        // unavailable asset state rather than substituting fictional media.
+        return { ...image, url: '' };
+      }
+    })
+  );
+  return { ...campaign, sourceData: { ...campaign.sourceData, uploadedImages } };
+};
 
 export class CampaignService {
+  private static requireOrganization(organizationId: string): void {
+    if (!organizationId) {
+      throw new ServiceError('forbidden', 'A live organization is required for this operation.');
+    }
+  }
+
   public static async getCampaigns(organizationId: string): Promise<Campaign[]> {
     if (!isSupabaseConfigured()) {
-      return CampaignStore.getAll();
+      return CampaignStore.getAll({ allowDemoFixtures: true });
     }
+    this.requireOrganization(organizationId);
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('campaigns')
       .select('*, campaign_content(*)')
       .eq('organization_id', organizationId)
       .order('updated_at', { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return CampaignStore.getAll();
+    if (error) {
+      throw new ServiceError('query_failed', 'Unable to load campaigns for this organization.', error);
     }
-
-    return data.map((row: any) => this.mapRowToCampaign(row));
+    // Empty is a valid live workspace state and must not become fictional data.
+    const rows = (data || []) as unknown as CampaignQueryRow[];
+    return Promise.all(rows.map((row) => hydrateSignedAssetUrls(mapRowToCampaign(row))));
   }
 
-  public static async getCampaignById(id: string): Promise<Campaign | null> {
+  public static async getCampaignById(id: string, organizationId?: string): Promise<Campaign | null> {
     if (!isSupabaseConfigured()) {
-      return CampaignStore.getById(id) || null;
+      return CampaignStore.getById(id, { allowDemoFixtures: true }) || null;
     }
+    if (!id) throw new ServiceError('not_found', 'A campaign ID is required.');
+    this.requireOrganization(organizationId || '');
 
-    const { data, error } = await (supabase as any)
-      .from('campaigns')
-      .select('*, campaign_content(*)')
-      .eq('id', id)
-      .maybeSingle();
+    let query = supabase.from('campaigns').select('*, campaign_content(*)').eq('id', id);
+    query = query.eq('organization_id', organizationId!);
+    const { data, error } = await query.maybeSingle();
 
-    if (error || !data) {
-      return CampaignStore.getById(id) || null;
+    if (error) {
+      throw new ServiceError('query_failed', 'Unable to load the campaign.', error);
     }
-
-    return this.mapRowToCampaign(data);
+    return data ? hydrateSignedAssetUrls(mapRowToCampaign(data as unknown as CampaignQueryRow)) : null;
   }
 
-  public static async saveCampaign(
+  private static async persistContent(organizationId: string, campaign: Campaign): Promise<void> {
+    if (!campaign.copy) return;
+
+    const payload: CampaignContentInsert = {
+      campaign_id: campaign.id,
+      organization_id: organizationId,
+      content_type: 'all_package',
+      content: asJson(campaign.copy),
+      quality_report: campaign.copy.qualityReport ? asJson(campaign.copy.qualityReport) : null,
+      is_accepted: true,
+      version: 1,
+    };
+    const { data: existing, error: lookupError } = await supabase
+      .from('campaign_content')
+      .select('id')
+      .eq('campaign_id', campaign.id)
+      .eq('content_type', 'all_package')
+      .eq('version', 1)
+      .maybeSingle();
+    if (lookupError) {
+      throw new ServiceError('write_failed', 'Campaign content could not be inspected before saving.', lookupError);
+    }
+
+    const write = existing
+      ? await supabase.from('campaign_content').update(payload).eq('id', existing.id)
+      : await supabase.from('campaign_content').insert(payload);
+    if (write.error) {
+      throw new ServiceError('write_failed', 'Campaign content could not be saved.', write.error);
+    }
+  }
+
+  /** Inserts without a client-generated ID; Supabase returns the canonical UUID row. */
+  public static async createCampaign(
+    organizationId: string,
+    draft: Campaign,
+    userId?: string
+  ): Promise<Campaign> {
+    if (!isSupabaseConfigured()) {
+      const localCampaign = { ...draft, id: localId() };
+      return CampaignStore.save(localCampaign, { allowDemoFixtures: true });
+    }
+    this.requireOrganization(organizationId);
+
+    const { data, error } = await supabase
+      .from('campaigns')
+      .insert(toPayload(organizationId, draft, userId))
+      .select('*')
+      .single();
+    if (error || !data) {
+      throw new ServiceError('write_failed', 'Campaign creation failed.', error);
+    }
+
+    const saved = { ...mapRowToCampaign(data as unknown as CampaignQueryRow), copy: draft.copy };
+    await this.persistContent(organizationId, saved);
+    return saved;
+  }
+
+  public static async updateCampaign(
     organizationId: string,
     campaign: Campaign,
     userId?: string
   ): Promise<Campaign> {
-    // Keep local cache updated
-    CampaignStore.save(campaign);
+    if (!campaign.id) throw new ServiceError('not_found', 'A campaign ID is required for an update.');
+    if (!isSupabaseConfigured()) return CampaignStore.save(campaign, { allowDemoFixtures: true });
+    this.requireOrganization(organizationId);
 
-    if (!isSupabaseConfigured()) {
-      return campaign;
+    const { data, error } = await supabase
+      .from('campaigns')
+      .update(toUpdatePayload(organizationId, campaign, userId))
+      .eq('id', campaign.id)
+      .eq('organization_id', organizationId)
+      .select('*')
+      .single();
+    if (error || !data) {
+      throw new ServiceError(error ? 'write_failed' : 'not_found', 'Campaign update failed.', error);
     }
 
-    const payload = {
-      organization_id: organizationId,
-      created_by: userId || null,
-      name: campaign.name,
-      campaign_type: campaign.sourceData.campaignType,
-      target_market: campaign.sourceData.targetMarket,
-      status: campaign.status,
-      source_data: campaign.sourceData as any,
-      strategy: (campaign.strategy as any) || null,
-      design_configs: campaign.designConfigs as any,
-      tags: campaign.tags || [],
-      updated_at: new Date().toISOString(),
-    };
-
-    const isExisting = Boolean(campaign.id && !campaign.id.startsWith('camp-sample-'));
-
-    if (isExisting) {
-      await (supabase as any).from('campaigns').update(payload).eq('id', campaign.id);
-    } else {
-      const { data } = await (supabase as any).from('campaigns').insert(payload).select('id').single();
-      if (data) {
-        campaign.id = data.id;
-      }
-    }
-
-    // Persist content revision if copy is present
-    if (campaign.copy && campaign.id) {
-      await (supabase as any).from('campaign_content').upsert({
-        campaign_id: campaign.id,
-        organization_id: organizationId,
-        content_type: 'all_package',
-        content: campaign.copy as any,
-        quality_report: (campaign.copy.qualityReport as any) || null,
-        updated_at: new Date().toISOString(),
-      });
-    }
-
-    return campaign;
+    const saved = { ...mapRowToCampaign(data as unknown as CampaignQueryRow), copy: campaign.copy };
+    await this.persistContent(organizationId, saved);
+    return saved;
   }
 
-  public static async deleteCampaign(id: string): Promise<void> {
-    CampaignStore.delete(id);
+  /** Explicit operation selection avoids guessing from client ID prefixes. */
+  public static async saveCampaign(
+    organizationId: string,
+    campaign: Campaign,
+    userId?: string,
+    operation: 'create' | 'update' = 'update'
+  ): Promise<Campaign> {
+    return operation === 'create'
+      ? this.createCampaign(organizationId, campaign, userId)
+      : this.updateCampaign(organizationId, campaign, userId);
+  }
 
-    if (isSupabaseConfigured()) {
-      await (supabase as any).from('campaigns').delete().eq('id', id);
+  public static async deleteCampaign(id: string, organizationId?: string): Promise<void> {
+    if (!isSupabaseConfigured()) {
+      CampaignStore.delete(id);
+      return;
     }
+    if (!organizationId) throw new ServiceError('forbidden', 'A live organization is required to delete a campaign.');
+
+    const { data, error } = await supabase
+      .from('campaigns')
+      .delete()
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .select('id');
+    if (error) throw new ServiceError('write_failed', 'Campaign deletion failed.', error);
+    if (!data || data.length === 0) throw new ServiceError('not_found', 'Campaign was not found.');
   }
 
   public static async duplicateCampaign(
@@ -104,35 +255,18 @@ export class CampaignService {
     organizationId: string,
     userId?: string
   ): Promise<Campaign | null> {
-    const original = await this.getCampaignById(id);
+    const original = await this.getCampaignById(id, organizationId);
     if (!original) return null;
 
+    const now = new Date().toISOString();
     const duplicated: Campaign = {
       ...original,
-      id: `camp-${Date.now()}`,
+      id: localId(),
       name: `${original.name} (Copy)`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
 
-    return this.saveCampaign(organizationId, duplicated, userId);
-  }
-
-  private static mapRowToCampaign(row: any): Campaign {
-    const copyContent = row.campaign_content?.find((c: any) => c.content_type === 'all_package');
-    const copy: CampaignCopy | undefined = copyContent?.content as any;
-
-    return {
-      id: row.id,
-      name: row.name,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      status: row.status,
-      sourceData: row.source_data as CampaignSourceData,
-      strategy: row.strategy as CampaignStrategy | undefined,
-      copy,
-      designConfigs: row.design_configs as Record<OutputAspectRatio, GraphicDesignConfig>,
-      tags: row.tags || [],
-    };
+    return this.createCampaign(organizationId, duplicated, userId);
   }
 }

@@ -1,119 +1,101 @@
-// Supabase Edge Function: generate-campaign-strategy
-// Description: Server-side Gemini strategy generation with API key protection and auth verification
+// Authenticated, server-owned campaign strategy generation.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import { AppError, ProviderError, providerAppError } from '../_shared/errors.ts';
+import { assertOrganizationAccess, authenticate } from '../_shared/auth.ts';
+import { claimGeneration, finishGeneration } from '../_shared/usage.ts';
+import { generateGeminiJson } from '../_shared/gemini.ts';
+import { assertGeminiTextModel, geminiTextIsPaid, GEMINI_TEXT_MODELS } from '../_shared/providers.ts';
+import { handleOptions, ensurePost, errorResponse, idempotencyKey, jsonResponse } from '../_shared/http.ts';
+import { parseBody, strategyOutputSchema, strategyRequestSchema } from '../_shared/validation.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const responseJsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['targetAudience', 'primaryObjective', 'coreAngle', 'valueProposition', 'keyHooks', 'supportingEvidence', 'ctaStrategy', 'suggestedPlatforms'],
+  properties: {
+    targetAudience: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['name', 'description', 'painPoints', 'motivations'],
+      properties: {
+        name: { type: 'string' },
+        description: { type: 'string' },
+        painPoints: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 20 },
+        motivations: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 20 },
+      },
+    },
+    primaryObjective: { type: 'string' },
+    coreAngle: { type: 'string' },
+    valueProposition: { type: 'string' },
+    keyHooks: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 20 },
+    supportingEvidence: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 20 },
+    ctaStrategy: { type: 'string' },
+    suggestedPlatforms: { type: 'array', items: { type: 'string', enum: ['facebook', 'instagram', 'linkedin', 'email', 'video_reels'] }, minItems: 1, maxItems: 10 },
+  },
 };
 
+const fallbackModel = GEMINI_TEXT_MODELS[0];
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  const startTime = Date.now();
-
+  const options = handleOptions(req);
+  if (options) return options;
+  let usageId: string | undefined;
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
+    ensurePost(req);
+    const ctx = await authenticate(req);
+    const body = await parseBody(req, strategyRequestSchema);
+    const requestKey = idempotencyKey(req, body);
+    await assertOrganizationAccess(ctx, body.organizationId, body.campaignId);
 
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const model = body.modelId ?? fallbackModel;
+    assertGeminiTextModel(model);
+    const isPaid = geminiTextIsPaid();
+    const estimatedCost = isPaid ? Number(Deno.env.get('GEMINI_TEXT_ESTIMATED_COST_USD') ?? NaN) : 0;
+    if (isPaid && (!Number.isFinite(estimatedCost) || estimatedCost < 0)) {
+      throw new AppError('provider_pricing_unconfigured', 503, 'The server is not configured for this provider.');
     }
-
-    const { sourceData, brandKit, organizationId, campaignId, modelId } = await req.json();
-    const apiKey = Deno.env.get('GEMINI_API_KEY');
-
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'GEMINI_API_KEY is not configured on server' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const targetModel = modelId || 'gemini-3.5-flash-lite';
-    const prop = sourceData.property;
-    const prompt = `You are an elite institutional real estate acquisitions strategist.
-Analyze this property and brand to build a quantitative marketing strategy.
-Property: ${prop?.address || sourceData.targetMarket}
-Type: ${sourceData.campaignType}
-Purchase Basis: $${prop?.financials?.purchasePrice || 'N/A'}
-Renovation Scope: $${prop?.financials?.renovationEstimate || 'N/A'}
-ARV: $${prop?.financials?.arv || 'N/A'}
-Thesis: ${prop?.investmentThesis || 'Value-add investment'}
-Brand: ${brandKit?.companyName || 'Apex Capital'}
-
-Generate a structured JSON response matching this schema:
-{
-  "targetAudience": {
-    "name": "string",
-    "painPoints": ["string", "string", "string"],
-    "motivations": ["string", "string", "string"]
-  },
-  "coreAngle": "string",
-  "valueProposition": "string",
-  "keyHooks": ["string", "string", "string"],
-  "supportingEvidence": ["string", "string", "string"],
-  "suggestedPlatforms": ["linkedin", "instagram", "facebook", "email", "video"]
-}
-Avoid all AI cliches like "unlock the potential", "game-changer", or "nestled". Focus on hard numbers, margin spreads, and comps.`;
-
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
-    const geminiRes = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.2,
-        },
-      }),
-    });
-
-    if (!geminiRes.ok) {
-      const errBody = await geminiRes.text();
-      throw new Error(`Gemini API error (HTTP ${geminiRes.status}): ${errBody}`);
-    }
-
-    const geminiData = await geminiRes.json();
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-    const strategy = JSON.parse(rawText);
-
-    // Audit log
-    await supabaseClient.from('ai_generation_logs').insert({
-      organization_id: organizationId || null,
-      user_id: user.id,
-      campaign_id: campaignId || null,
-      operation_type: 'generate-strategy',
+    const claim = await claimGeneration(ctx.admin, {
+      organizationId: body.organizationId,
+      userId: ctx.user.id,
+      campaignId: body.campaignId,
+      operationType: 'generate-strategy',
       provider: 'gemini',
-      model: targetModel,
-      status: 'success',
-      latency_ms: Date.now() - startTime,
+      model,
+      idempotencyKey: requestKey,
+      isPaid,
+      estimatedCostUsd: estimatedCost,
     });
+    usageId = claim.usageId;
 
-    return new Response(JSON.stringify({ strategy, model: targetModel }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    const source = body.sourceData as Record<string, any>;
+    const brand = body.brandKit as Record<string, any>;
+    const property = (source.property ?? {}) as Record<string, any>;
+    const financials = (property.financials ?? {}) as Record<string, any>;
+const prompt = `You are an institutional real-estate marketing strategist. Return only JSON matching the supplied schema.
+Use only facts present in the source data. Do not invent comps, returns, guarantees, legal claims, or market statistics. Include a target-audience description, a primary objective, and a concrete CTA strategy. Use suggested platform values only from facebook, instagram, linkedin, email, and video_reels.
+Avoid generic phrases such as "unlock the potential", "game-changer", and "nestled".
+Property: ${String(property.address ?? source.targetMarket ?? 'Unspecified')}
+Campaign type: ${String(source.campaignType ?? 'Unspecified')}
+Purchase basis: ${String(financials.purchasePrice ?? 'Unspecified')}
+Renovation scope: ${String(financials.renovationEstimate ?? 'Unspecified')}
+ARV: ${String(financials.arv ?? 'Unspecified')}
+Investment thesis: ${String(property.investmentThesis ?? 'Unspecified')}
+Brand: ${String(brand.companyName ?? 'Unspecified')}`;
+
+    try {
+      const parsed = await generateGeminiJson(model, prompt, responseJsonSchema, body.thinkingLevel);
+      const validated = strategyOutputSchema.safeParse(parsed);
+      if (!validated.success) throw new ProviderError('provider_invalid_output');
+      await finishGeneration(ctx.admin, usageId, 'success', undefined, estimatedCost);
+      return jsonResponse(req, { strategy: validated.data, model, provenance: 'generated' });
+    } catch (error) {
+      await finishGeneration(ctx.admin, usageId, 'failed', error instanceof ProviderError ? error.code : 'provider_error');
+      if (error instanceof ProviderError) throw providerAppError(error);
+      throw error;
+    }
+  } catch (error) {
+    if (error instanceof AppError) return errorResponse(req, error);
+    return errorResponse(req, providerAppError(error));
   }
 });

@@ -18,6 +18,8 @@ import {
 interface StrategyWorkspaceProps {
   campaign: Campaign;
   brandKit: BrandKit;
+  organizationId?: string;
+  runtimeMode: 'demo' | 'live';
   onSaveStrategy: (strategy: CampaignStrategy) => void;
   onProceedToCopy?: () => void;
 }
@@ -25,6 +27,8 @@ interface StrategyWorkspaceProps {
 export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
   campaign,
   brandKit,
+  organizationId,
+  runtimeMode,
   onSaveStrategy,
   onProceedToCopy,
 }) => {
@@ -43,7 +47,8 @@ export const StrategyWorkspace: React.FC<StrategyWorkspaceProps> = ({
       const generated = await provider.generateStrategy(
         campaign.sourceData,
         brandKit,
-        (step) => setProgressMsg(step)
+        (step) => setProgressMsg(step),
+        { organizationId, campaignId: campaign.id, runtimeMode }
       );
 
       if (generated.generationMetadata?.fallbackOccurred) {

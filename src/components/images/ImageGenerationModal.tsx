@@ -11,6 +11,7 @@ import { SettingsStore } from '../../services/storage/settingsStore';
 import { ImageProviderRegistry } from '../../services/providers/imageProviderRegistry';
 import { ImageSpendingTracker } from '../../services/providers/imageSpendingTracker';
 import { ImageProviderRouter } from '../../services/providers/imageProvider';
+import { isSupabaseConfigured } from '../../services/supabase/client';
 import { 
   Sparkles, 
   X, 
@@ -38,8 +39,8 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   onClose,
   onImageGenerated,
   brandKit,
-  targetMarket = 'Phoenix, AZ',
-  propertyTitle = 'Residential Property',
+  targetMarket = 'the selected market',
+  propertyTitle = 'Property campaign',
   propertyType = 'single_family',
   uploadedImages = [],
   campaignId,
@@ -68,6 +69,11 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
 
   const handleGenerate = async () => {
     setErrorMsg(null);
+
+    if (isSupabaseConfigured() && !campaignId) {
+      setErrorMsg('Save the campaign before requesting live image generation so the asset can be stored securely.');
+      return;
+    }
 
     // Enforce cost safety
     if (isPaidTier) {
@@ -103,15 +109,17 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
       const adapter = ImageProviderRouter.getAdapterForConfig({
         ...config,
         imageQualityTier: qualityTier,
-      });
+      }, { campaignId });
 
       const result = await adapter.generateFromBrief(brief, (step) => setProgressMsg(step));
 
       const newCampaignImg: CampaignImage = {
         id: result.id || `ai-img-${Date.now()}`,
         url: result.url,
-        name: `AI Visual: ${purpose.toUpperCase()} (${result.provider})`,
-        source: 'ai_generated',
+        name: result.provider === 'demo_fixture'
+          ? `Fictional Demo Visual: ${purpose.toUpperCase()}`
+          : `AI Visual: ${purpose.toUpperCase()} (${result.provider})`,
+        source: result.provider === 'demo_fixture' ? 'sample' : 'ai_generated',
         aspectRatio: aspectRatio === '16:9' ? 1.77 : aspectRatio === '4:5' ? 0.8 : aspectRatio === '9:16' ? 0.56 : 1.0,
         isHero: purpose === 'hero',
         isAiIllustrative: true,
@@ -119,6 +127,9 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
         estimatedCostUsd: result.costMetadata?.estimatedCostUsd || (isPaidTier ? estimatedCost : 0),
         provider: result.provider,
         model: result.metadata?.modelId,
+        provenance: result.provenance,
+        storageBucket: result.storageBucket,
+        storagePath: result.storagePath,
       };
 
       onImageGenerated(newCampaignImg);
@@ -140,7 +151,12 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col border border-slate-200 overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="image-generation-title"
+        className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col border border-slate-200 overflow-hidden"
+      >
         {/* Header */}
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div>
@@ -155,12 +171,13 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 </span>
               )}
             </div>
-            <h3 className="text-lg font-serif font-bold text-slate-900 mt-1">
+            <h3 id="image-generation-title" className="text-lg font-serif font-bold text-slate-900 mt-1">
               Generate Campaign Visual Concept
             </h3>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close image generation dialog"
             className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -184,7 +201,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 {
                   id: 'free_dev',
                   label: 'Free / Prototype',
-                  provider: 'NVIDIA NIM / Curated Uploads',
+                  provider: 'Authentic Upload / Bundled Demo Fixture',
                   cost: 'Free ($0.00)',
                   badge: 'FREE',
                   badgeColor: 'bg-slate-100 text-slate-700',
@@ -193,7 +210,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                   id: 'paid_standard',
                   label: 'Production Standard',
                   provider: 'FLUX.2 Pro',
-                  cost: '~$0.05 / img',
+                  cost: 'from ~$0.03 / img',
                   badge: 'PAID',
                   badgeColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
                   disabled: !isPaidAllowed,
@@ -202,7 +219,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                   id: 'paid_maximum',
                   label: 'Maximum Quality (Hero)',
                   provider: 'FLUX.2 Max',
-                  cost: '~$0.08 / img',
+                  cost: 'from ~$0.07 / img',
                   badge: 'PREMIUM',
                   badgeColor: 'bg-purple-50 text-purple-700 border border-purple-200',
                   disabled: !isPaidAllowed,
@@ -210,8 +227,8 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 {
                   id: 'paid_alternate',
                   label: 'Multimodal Grounding',
-                  provider: 'Gemini Nano Banana Pro',
-                  cost: '~$0.04 / img',
+                  provider: 'Gemini 3.1 Flash Image (server verification required)',
+                  cost: 'Server estimate required',
                   badge: 'GEMINI',
                   badgeColor: 'bg-blue-50 text-blue-700 border border-blue-200',
                   disabled: !isPaidAllowed,

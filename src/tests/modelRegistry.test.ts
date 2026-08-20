@@ -92,13 +92,13 @@ describe('AI Model Registry & Quotas', () => {
     expect(premiumChain).toContain('gemini-3.5-flash-lite');
   });
 
-  it('should mark Gemini image generation as 0 free quota and NVIDIA as available', () => {
-    const geminiImage = IMAGE_MODELS['gemini-nano-banana'];
+  it('marks current image models as unavailable until server access is verified', () => {
+    const geminiImage = IMAGE_MODELS['gemini-3.1-flash-image'];
     expect(geminiImage.quotaAvailable).toBe(false);
 
-    const nvidiaSdxl = IMAGE_MODELS['stabilityai/sdxl-turbo'];
-    expect(nvidiaSdxl.quotaAvailable).toBe(true);
-    expect(nvidiaSdxl.provider).toBe('nvidia');
+    const nvidiaModel = IMAGE_MODELS['stabilityai/stable-diffusion-3.5-large'];
+    expect(nvidiaModel.quotaAvailable).toBe(false);
+    expect(nvidiaModel.provider).toBe('nvidia');
 
     const uploadOnly = IMAGE_MODELS['authentic-upload-only'];
     expect(uploadOnly.quotaAvailable).toBe(true);

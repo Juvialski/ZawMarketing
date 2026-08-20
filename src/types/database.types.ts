@@ -8,6 +8,7 @@ export type Json =
 
 export interface Database {
   public: {
+    Views: Record<string, never>;
     Tables: {
       profiles: {
         Row: {
@@ -34,6 +35,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       organizations: {
         Row: {
@@ -57,6 +59,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       organization_members: {
         Row: {
@@ -80,6 +83,7 @@ export interface Database {
           role?: 'owner' | 'admin' | 'member';
           created_at?: string;
         };
+        Relationships: [];
       };
       brand_kits: {
         Row: {
@@ -151,6 +155,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       campaigns: {
         Row: {
@@ -201,6 +206,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       campaign_content: {
         Row: {
@@ -242,6 +248,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       campaign_assets: {
         Row: {
@@ -249,8 +256,9 @@ export interface Database {
           campaign_id: string;
           organization_id: string;
           asset_type: 'hero_photo' | 'property_photo' | 'ai_concept' | 'rendered_graphic' | 'pdf_flyer';
+          storage_bucket: string;
           storage_path: string;
-          public_url: string;
+          public_url: string | null;
           mime_type: string;
           width: number | null;
           height: number | null;
@@ -265,8 +273,9 @@ export interface Database {
           campaign_id: string;
           organization_id: string;
           asset_type?: 'hero_photo' | 'property_photo' | 'ai_concept' | 'rendered_graphic' | 'pdf_flyer';
+          storage_bucket?: string;
           storage_path: string;
-          public_url: string;
+          public_url?: string | null;
           mime_type?: string;
           width?: number | null;
           height?: number | null;
@@ -281,8 +290,9 @@ export interface Database {
           campaign_id?: string;
           organization_id?: string;
           asset_type?: 'hero_photo' | 'property_photo' | 'ai_concept' | 'rendered_graphic' | 'pdf_flyer';
+          storage_bucket?: string;
           storage_path?: string;
-          public_url?: string;
+          public_url?: string | null;
           mime_type?: string;
           width?: number | null;
           height?: number | null;
@@ -292,6 +302,7 @@ export interface Database {
           metadata?: Json;
           created_at?: string;
         };
+        Relationships: [];
       };
       design_exports: {
         Row: {
@@ -300,6 +311,7 @@ export interface Database {
           organization_id: string;
           template_family: string;
           aspect_ratio: string;
+          storage_bucket: string | null;
           storage_path: string | null;
           public_url: string | null;
           format: 'png' | 'jpeg' | 'pdf' | 'zip';
@@ -312,6 +324,7 @@ export interface Database {
           organization_id: string;
           template_family: string;
           aspect_ratio: string;
+          storage_bucket?: string | null;
           storage_path?: string | null;
           public_url?: string | null;
           format: 'png' | 'jpeg' | 'pdf' | 'zip';
@@ -324,12 +337,14 @@ export interface Database {
           organization_id?: string;
           template_family?: string;
           aspect_ratio?: string;
+          storage_bucket?: string | null;
           storage_path?: string | null;
           public_url?: string | null;
           format?: 'png' | 'jpeg' | 'pdf' | 'zip';
           file_size_bytes?: number | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       lead_lists: {
         Row: {
@@ -362,6 +377,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       leads: {
         Row: {
@@ -427,6 +443,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       ai_generation_logs: {
         Row: {
@@ -468,6 +485,7 @@ export interface Database {
           error_message?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
     };
     Functions: {

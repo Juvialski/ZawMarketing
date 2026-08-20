@@ -37,13 +37,13 @@ export const AppShell: React.FC<AppShellProps> = ({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header Bar */}
-        <header className="h-16 bg-white border-b border-slate-200 px-6 sm:px-8 flex items-center justify-between sticky top-0 z-20 shadow-subtle">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-mono font-bold text-slate-500 uppercase tracking-widest">
+        <header className="h-16 bg-white border-b border-slate-200 px-3 sm:px-8 flex items-center justify-between sticky top-0 z-20 shadow-subtle">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="hidden sm:inline text-xs font-mono font-bold text-slate-500 uppercase tracking-widest">
               ZAW REAL ESTATE STUDIO
             </span>
-            <span className="text-slate-300">/</span>
-            <span className="text-xs font-semibold text-slate-800 capitalize">
+            <span className="hidden sm:inline text-slate-300">/</span>
+            <span className="text-xs font-semibold text-slate-800 capitalize truncate">
               {activeView.replace('_', ' ')}
             </span>
           </div>
@@ -84,7 +84,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                       {profile.displayName}
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono truncate">
-                      {organization?.name || 'Apex Capital Partners'}
+                      {organization?.name || 'Workspace'}
                     </div>
                   </div>
                   <button
@@ -109,7 +109,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         </header>
 
         {/* Dynamic Page Content */}
-        <main className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-8 max-w-7xl w-full mx-auto min-w-0 overflow-x-hidden">
           {children}
         </main>
       </div>

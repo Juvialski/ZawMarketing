@@ -17,29 +17,29 @@ describe('Image Provider Registry, Quality Tiers & Creative Brief Composer', () 
     expect(providerIds).toContain('openai_image');
   });
 
-  it('should define FLUX.2 Pro, FLUX.2 Max, and FLUX.2 Flex with correct cost estimates and tiers', () => {
+  it('defines current FLUX.2 endpoints with documented starting estimates and tiers', () => {
     const fluxPro = IMAGE_MODELS['flux-2-pro'];
     const fluxMax = IMAGE_MODELS['flux-2-max'];
     const fluxFlex = IMAGE_MODELS['flux-2-flex'];
 
     expect(fluxPro.tier).toBe('paid_standard');
-    expect(fluxPro.estimatedCostUsd).toBe(0.05);
+    expect(fluxPro.estimatedCostUsd).toBe(0.03);
     expect(fluxPro.supportsMultipleReferences).toBe(true);
 
     expect(fluxMax.tier).toBe('paid_maximum');
-    expect(fluxMax.userLabel).toContain('Maximum Quality');
-    expect(fluxMax.estimatedCostUsd).toBe(0.08);
+    expect(fluxMax.userLabel).toContain('maximum quality');
+    expect(fluxMax.estimatedCostUsd).toBe(0.07);
 
     expect(fluxFlex.tier).toBe('paid_specialized');
-    expect(fluxFlex.estimatedCostUsd).toBe(0.06);
+    expect(fluxFlex.estimatedCostUsd).toBe(0.05);
   });
 
-  it('should define Gemini Nano Banana Pro as a paid alternate with multimodal grounding', () => {
-    const nanoBanana = IMAGE_MODELS['nano-banana-pro'];
-    expect(nanoBanana.tier).toBe('paid_alternate');
-    expect(nanoBanana.estimatedCostUsd).toBe(0.04);
-    expect(nanoBanana.supportsGrounding).toBe(true);
-    expect(nanoBanana.supportsBrandColorControl).toBe(true);
+  it('uses a current official Gemini image ID without an Imagen substitution', () => {
+    const geminiImage = IMAGE_MODELS['gemini-3.1-flash-image'];
+    expect(geminiImage.tier).toBe('paid_alternate');
+    expect(geminiImage.estimatedCostUsd).toBe(0);
+    expect(geminiImage.supportsGrounding).toBe(true);
+    expect(geminiImage.description).toContain('no retired Imagen substitution');
   });
 
   it('should strictly force free/dev tier when enablePaidGeneration is false', () => {
@@ -51,9 +51,9 @@ describe('Image Provider Registry, Quality Tiers & Creative Brief Composer', () 
       premiumModelId: 'gemini-3.7-flash',
       imageProvider: 'bfl',
       imageQualityTier: 'paid_maximum',
-      geminiImageModel: 'nano-banana-pro',
+      geminiImageModel: 'gemini-3.1-flash-image',
       geminiImageQuotaAvailable: false,
-      nvidiaModelId: 'stabilityai/sdxl-turbo',
+      nvidiaModelId: 'stabilityai/stable-diffusion-3.5-large',
       imageSpendingLimits: {
         enablePaidGeneration: false, // OFF
         preferredPaidProvider: 'bfl',
@@ -75,7 +75,7 @@ describe('Image Provider Registry, Quality Tiers & Creative Brief Composer', () 
     const resolved = ImageProviderRegistry.resolveProviderForBrief(brief, config);
     expect(resolved.isPaid).toBe(false);
     expect(resolved.estimatedCostUsd).toBe(0.0);
-    expect(['nvidia', 'upload']).toContain(resolved.providerId);
+    expect(resolved.providerId).toBe('upload');
   });
 
   it('should resolve FLUX.2 Max for hero and FLUX.2 Pro for supporting in auto mode when paid is enabled', () => {
@@ -87,9 +87,9 @@ describe('Image Provider Registry, Quality Tiers & Creative Brief Composer', () 
       premiumModelId: 'gemini-3.7-flash',
       imageProvider: 'bfl',
       imageQualityTier: 'auto',
-      geminiImageModel: 'nano-banana-pro',
+      geminiImageModel: 'gemini-3.1-flash-image',
       geminiImageQuotaAvailable: false,
-      nvidiaModelId: 'stabilityai/sdxl-turbo',
+      nvidiaModelId: 'stabilityai/stable-diffusion-3.5-large',
       imageSpendingLimits: {
         enablePaidGeneration: true,
         preferredPaidProvider: 'bfl',
@@ -110,7 +110,7 @@ describe('Image Provider Registry, Quality Tiers & Creative Brief Composer', () 
     const resolvedHero = ImageProviderRegistry.resolveProviderForBrief(heroBrief, config);
     expect(resolvedHero.isPaid).toBe(true);
     expect(resolvedHero.modelId).toBe('flux-2-max');
-    expect(resolvedHero.estimatedCostUsd).toBe(0.08);
+    expect(resolvedHero.estimatedCostUsd).toBe(0.07);
 
     const supportingBrief: ImageCreativeBrief = {
       purpose: 'supporting',
@@ -121,7 +121,7 @@ describe('Image Provider Registry, Quality Tiers & Creative Brief Composer', () 
     const resolvedSupporting = ImageProviderRegistry.resolveProviderForBrief(supportingBrief, config);
     expect(resolvedSupporting.isPaid).toBe(true);
     expect(resolvedSupporting.modelId).toBe('flux-2-pro');
-    expect(resolvedSupporting.estimatedCostUsd).toBe(0.05);
+    expect(resolvedSupporting.estimatedCostUsd).toBe(0.03);
   });
 
   it('should compose structured creative briefs from property and brand context', () => {

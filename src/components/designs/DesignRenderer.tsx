@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Campaign, GraphicDesignConfig, OutputAspectRatio } from '../../types/campaign';
 import { BrandKit } from '../../types/brandKit';
 import { FORMAT_DIMENSIONS } from '../../types/designs';
@@ -16,6 +16,7 @@ interface DesignRendererProps {
   brandKit: BrandKit;
   className?: string;
   id?: string;
+  showSafeZones?: boolean;
 }
 
 export const DesignRenderer: React.FC<DesignRendererProps> = ({
@@ -25,7 +26,11 @@ export const DesignRenderer: React.FC<DesignRendererProps> = ({
   brandKit,
   className = '',
   id,
+  showSafeZones = false,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
   const baseConfig = campaign.designConfigs[aspectRatio] || {
     templateFamily: 'editorial',
     aspectRatio,
@@ -47,20 +52,31 @@ export const DesignRenderer: React.FC<DesignRendererProps> = ({
     campaign.sourceData.uploadedImages.find((img) => img.id === config.imageId) ||
     campaign.sourceData.uploadedImages.find((img) => img.isHero) ||
     campaign.sourceData.uploadedImages[0] || {
-      url: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=1600&q=80',
+      url: '/demo/fictional-property-exterior.png',
     };
 
   const dimensions = FORMAT_DIMENSIONS[aspectRatio];
+  const isA4 = aspectRatio === 'flyer_a4';
+  const isLetter = aspectRatio === 'flyer_letter';
+  const nativeWidth = isLetter ? 1275 : isA4 ? 1240 : dimensions.width;
+  const nativeHeight = isLetter ? 1650 : isA4 ? 1754 : dimensions.height;
 
-  // Aspect ratio class mapping
-  const aspectClassMap: Record<OutputAspectRatio, string> = {
-    square: 'canvas-aspect-square',
-    portrait: 'canvas-aspect-portrait',
-    story: 'canvas-aspect-story',
-    landscape: 'canvas-aspect-landscape',
-    flyer_letter: 'canvas-aspect-flyer-letter',
-    flyer_a4: 'canvas-aspect-flyer-a4',
-  };
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const updateScale = () => {
+      if (containerRef.current) {
+        const clientWidth = containerRef.current.clientWidth;
+        if (clientWidth > 0) {
+          setScale(clientWidth / nativeWidth);
+        }
+      }
+    };
+
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [nativeWidth]);
 
   const renderTemplateContent = () => {
     if (aspectRatio === 'flyer_letter' || aspectRatio === 'flyer_a4') {
@@ -126,13 +142,43 @@ export const DesignRenderer: React.FC<DesignRendererProps> = ({
 
   return (
     <div
-      id={id}
-      className={`relative w-full ${aspectClassMap[aspectRatio]} overflow-hidden shadow-md bg-white ${className}`}
-      data-aspect-ratio={aspectRatio}
-      data-target-width={dimensions.width}
-      data-target-height={dimensions.height}
+      ref={containerRef}
+      className={`relative w-full overflow-hidden shadow-elevated bg-slate-900 rounded-lg ${className}`}
+      style={{
+        aspectRatio: `${nativeWidth} / ${nativeHeight}`,
+      }}
     >
-      {renderTemplateContent()}
+      <div
+        id={id}
+        data-aspect-ratio={aspectRatio}
+        data-target-width={dimensions.width}
+        data-target-height={dimensions.height}
+        style={{
+          width: `${nativeWidth}px`,
+          height: `${nativeHeight}px`,
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+        }}
+        className="relative origin-top-left"
+      >
+        {renderTemplateContent()}
+
+        {/* Safe Zone Overlay Guide for QA */}
+        {showSafeZones && (
+          <div className="absolute inset-0 pointer-events-none z-50 border-2 border-red-500/40">
+            {aspectRatio === 'story' && (
+              <>
+                <div className="absolute top-0 inset-x-0 h-[180px] bg-red-500/10 border-b border-red-500/50 flex items-center justify-center text-red-500 font-mono text-[14px]">
+                  TOP SAFE ZONE (Reserved for Instagram/TikTok UI)
+                </div>
+                <div className="absolute bottom-0 inset-x-0 h-[250px] bg-red-500/10 border-t border-red-500/50 flex items-center justify-center text-red-500 font-mono text-[14px]">
+                  BOTTOM SAFE ZONE (Reserved for UI / Sound Bar)
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

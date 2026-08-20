@@ -13,17 +13,28 @@ export type CampaignType =
 
 export type CampaignStatus = 'draft' | 'strategy_ready' | 'copy_ready' | 'designs_ready' | 'completed';
 
+export interface FinancingInputs {
+  downPaymentPercent?: number;
+  interestRatePercent?: number;
+  loanTermYears?: number;
+  monthlyDebtService?: number;
+  annualDebtService?: number;
+}
+
 export interface PropertyFinancials {
   purchasePrice?: number;
   renovationEstimate?: number;
   arv?: number; // After Repair Value
   projectedRentMonthly?: number;
   currentRentMonthly?: number;
+  inPlaceNOI?: number;
+  stabilizedNOI?: number;
   capRatePercent?: number;
   cashOnCashPercent?: number;
   roiPercent?: number;
   projectedProfit?: number;
   equitySpread?: number;
+  financing?: FinancingInputs;
 }
 
 export interface PropertyDetails {
@@ -70,6 +81,9 @@ export interface CampaignImage {
   estimatedCostUsd?: number;
   provider?: string;
   model?: string;
+  provenance?: 'generated' | 'uploaded' | 'fixture' | 'fallback' | 'failed';
+  storageBucket?: string;
+  storagePath?: string;
 }
 
 import { GenerationMetadata } from './providers';

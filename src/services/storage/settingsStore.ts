@@ -1,54 +1,90 @@
 import { ProviderConfig } from '../../types/providers';
 import { ModelRegistry } from '../providers/modelRegistry';
 
-const SETTINGS_STORAGE_KEY = 'zaw_marketing_provider_settings_v2';
+/**
+ * Settings are deliberately limited to client-safe preferences. Provider
+ * credentials and provider endpoints belong to the authenticated backend and
+ * are never read from Vite env, rendered, or persisted in this store.
+ */
+export const SETTINGS_STORAGE_KEY = 'zaw_marketing_provider_settings_v2';
 let inMemorySettingsStorage: string | null = null;
+
+type UnknownRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is UnknownRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const getStorage = (): Storage | null => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+    if (typeof localStorage !== 'undefined') return localStorage;
+  } catch {
+    // Storage can be disabled by browser privacy settings.
+  }
+  return null;
+};
+
+const withoutSecrets = (value: UnknownRecord): UnknownRecord => {
+  const {
+    geminiApiKey: _geminiApiKey,
+    nvidiaApiKey: _nvidiaApiKey,
+    bflApiKey: _bflApiKey,
+    openaiApiKey: _openaiApiKey,
+    ...safe
+  } = value;
+  return safe;
+};
+
+export type SettingsRuntimeMode = 'demo' | 'live';
 
 export class SettingsStore {
   private static getStorageItem(key: string): string | null {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
+    const storage = getStorage();
+    if (storage) {
+      try {
+        return storage.getItem(key);
+      } catch {
+        // Fall through to the in-memory fallback.
       }
-      if (typeof localStorage !== 'undefined') {
-        return localStorage.getItem(key);
-      }
-    } catch {
-      // Ignore
     }
     return inMemorySettingsStorage;
   }
 
   private static setStorageItem(key: string, value: string): void {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
+    const storage = getStorage();
+    if (storage) {
+      try {
+        storage.setItem(key, value);
         return;
+      } catch {
+        // Fall through to the in-memory fallback.
       }
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(key, value);
-        return;
-      }
-    } catch {
-      // Ignore
     }
     inMemorySettingsStorage = value;
   }
 
-  public static get(): ProviderConfig {
-    const env = (import.meta as any).env || {};
-    const envGeminiKey = env.VITE_GEMINI_API_KEY || '';
-    const envNvidiaKey = env.VITE_NVIDIA_API_KEY || '';
-    const envBflKey = env.VITE_BFL_API_KEY || '';
-    const envOpenAiKey = env.VITE_OPENAI_API_KEY || '';
+  private static removeStorageItem(key: string): void {
+    const storage = getStorage();
+    if (storage) {
+      try {
+        storage.removeItem(key);
+      } catch {
+        // Ignore unavailable storage.
+      }
+    }
+    inMemorySettingsStorage = null;
+  }
 
+  public static get(): ProviderConfig {
+    // No VITE_* provider credentials are intentionally read here. Vite embeds
+    // those values in browser assets, which is not an acceptable secret store.
     const defaultConfig: ProviderConfig = {
-      aiProvider: envGeminiKey ? 'gemini' : 'mock',
-      geminiApiKey: envGeminiKey,
-      defaultModelId: env.VITE_GEMINI_MODEL || ModelRegistry.DEFAULT_TEXT_MODEL, // gemini-3.5-flash-lite
-      geminiModel: env.VITE_GEMINI_MODEL || ModelRegistry.DEFAULT_TEXT_MODEL,
-      fallbackModelId: ModelRegistry.FALLBACK_TEXT_MODEL, // gemini-3.1-flash-lite
-      premiumModelId: ModelRegistry.PREFERRED_PREMIUM_MODEL, // gemini-3.7-flash
+      runtimeMode: 'demo',
+      aiProvider: 'mock',
+      defaultModelId: ModelRegistry.DEFAULT_TEXT_MODEL,
+      geminiModel: ModelRegistry.DEFAULT_TEXT_MODEL,
+      fallbackModelId: ModelRegistry.FALLBACK_TEXT_MODEL,
+      premiumModelId: ModelRegistry.PREFERRED_PREMIUM_MODEL,
       operationOverrides: {},
       thinkingLevels: {
         campaign_kit: 'low',
@@ -56,74 +92,77 @@ export class SettingsStore {
         final_review: 'high',
         platform_variants: 'low',
       },
-
-      // Image Provider & Quality Tiers
-      imageProvider: envBflKey ? 'bfl' : (envNvidiaKey ? 'nvidia' : 'upload'),
+      imageProvider: 'upload',
       imageQualityTier: 'free_dev',
-      geminiImageModel: 'nano-banana-pro',
-      geminiImageQuotaAvailable: false, // 0 free quota in project dashboard
-      nvidiaApiKey: envNvidiaKey,
-      nvidiaBaseUrl: env.VITE_NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
-      nvidiaModelId: env.VITE_NVIDIA_MODEL || ModelRegistry.DEFAULT_NVIDIA_MODEL,
-      bflApiKey: envBflKey,
-      bflBaseUrl: env.VITE_BFL_BASE_URL || 'https://api.bfl.ml/v1',
-      bflModelId: 'flux-2-pro',
-      openaiApiKey: envOpenAiKey,
-      openaiBaseUrl: 'https://api.openai.com/v1',
-      openaiImageModel: 'gpt-image-2',
-
-      // Spending Limits (Cost Safety by default)
+      geminiImageModel: '',
+      geminiImageQuotaAvailable: false,
+      nvidiaModelId: '',
+      bflModelId: '',
+      openaiImageModel: '',
       imageSpendingLimits: {
-        enablePaidGeneration: false, // Default false to prevent unexpected spend
+        enablePaidGeneration: false,
         preferredPaidProvider: 'bfl',
-        preferredPaidModel: 'flux-2-max',
+        preferredPaidModel: '',
         maxImagesPerCampaign: 5,
-        dailySpendingLimitUsd: 5.0,
-        monthlySpendingLimitUsd: 50.0,
+        dailySpendingLimitUsd: 5,
+        monthlySpendingLimitUsd: 50,
       },
-
-      useMockFallback: true,
+      useMockFallback: false,
       customQuotas: {
-        'gemini-3.5-flash-lite': { rpm: 15, tpm: 250000, rpd: 500 },
-        'gemini-3.1-flash-lite': { rpm: 15, tpm: 250000, rpd: 500 },
-        'gemini-3.5-flash': { rpm: 5, tpm: 250000, rpd: 20 },
-        'gemini-3.6-flash': { rpm: 5, tpm: 250000, rpd: 20 },
-        'gemini-3.7-flash': { rpm: 5, tpm: 250000, rpd: 20 },
+        // These are local estimates only. Provider project limits are managed
+        // by the provider and may change independently of this UI.
+        [ModelRegistry.DEFAULT_TEXT_MODEL]: { rpm: 0, tpm: 0, rpd: 0 },
+        [ModelRegistry.FALLBACK_TEXT_MODEL]: { rpm: 0, tpm: 0, rpd: 0 },
+        [ModelRegistry.PREFERRED_PREMIUM_MODEL]: { rpm: 0, tpm: 0, rpd: 0 },
       },
     };
 
-    try {
-      const stored = this.getStorageItem(SETTINGS_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return {
-          ...defaultConfig,
-          ...parsed,
-          imageSpendingLimits: {
-            ...defaultConfig.imageSpendingLimits,
-            ...(parsed.imageSpendingLimits || {}),
-          },
-          defaultModelId: parsed.defaultModelId || parsed.geminiModel || defaultConfig.defaultModelId,
-          geminiModel: parsed.defaultModelId || parsed.geminiModel || defaultConfig.defaultModelId,
-        };
-      }
-    } catch (e) {
-      console.warn('Failed to parse stored settings, using default', e);
-    }
+    const stored = this.getStorageItem(SETTINGS_STORAGE_KEY);
+    if (!stored) return defaultConfig;
 
-    return defaultConfig;
+    try {
+      const parsed: unknown = JSON.parse(stored);
+      if (!isRecord(parsed)) return defaultConfig;
+
+      // Migrate old key-bearing records by immediately replacing them with a
+      // key-free representation. The values themselves are never returned.
+      const safeParsed = withoutSecrets(parsed);
+      const merged: ProviderConfig = {
+        ...defaultConfig,
+        ...safeParsed,
+        imageSpendingLimits: {
+          ...defaultConfig.imageSpendingLimits,
+          ...(isRecord(safeParsed.imageSpendingLimits) ? safeParsed.imageSpendingLimits : {}),
+        },
+        defaultModelId:
+          typeof safeParsed.defaultModelId === 'string' && safeParsed.defaultModelId
+            ? safeParsed.defaultModelId
+            : typeof safeParsed.geminiModel === 'string' && safeParsed.geminiModel
+              ? safeParsed.geminiModel
+              : defaultConfig.defaultModelId,
+      };
+      merged.geminiModel = merged.defaultModelId;
+      this.setStorageItem(SETTINGS_STORAGE_KEY, JSON.stringify(withoutSecrets(merged as unknown as UnknownRecord)));
+      return merged;
+    } catch (error) {
+      console.warn('Failed to parse stored settings; using safe defaults', error);
+      this.removeStorageItem(SETTINGS_STORAGE_KEY);
+      return defaultConfig;
+    }
   }
 
   public static save(config: ProviderConfig): ProviderConfig {
-    try {
-      const normalized: ProviderConfig = {
-        ...config,
-        geminiModel: config.defaultModelId,
-      };
-      this.setStorageItem(SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
-    } catch (e) {
-      console.error('Failed to save settings', e);
-    }
-    return config;
+    const normalized: ProviderConfig = {
+      ...config,
+      // Keep the legacy alias consistent for callers that still read it.
+      geminiModel: config.defaultModelId,
+    };
+    const safe = withoutSecrets(normalized as unknown as UnknownRecord);
+    this.setStorageItem(SETTINGS_STORAGE_KEY, JSON.stringify(safe));
+    return normalized;
+  }
+
+  public static clear(): void {
+    this.removeStorageItem(SETTINGS_STORAGE_KEY);
   }
 }

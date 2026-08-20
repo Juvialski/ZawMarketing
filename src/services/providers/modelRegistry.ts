@@ -107,35 +107,27 @@ export interface ImageModelDefinition {
 }
 
 export const IMAGE_MODELS: Record<string, ImageModelDefinition> = {
-  'stabilityai/sdxl-turbo': {
-    id: 'stabilityai/sdxl-turbo',
+  'stabilityai/stable-diffusion-3.5-large': {
+    id: 'stabilityai/stable-diffusion-3.5-large',
     provider: 'nvidia',
-    displayName: 'NVIDIA: SDXL Turbo (Fast Concept)',
-    description: 'Sub-second real-time architectural and neighborhood concept image generation via NVIDIA NIM.',
-    quotaAvailable: true,
-    recommended: true,
+    displayName: 'NVIDIA: Stable Diffusion 3.5 Large',
+    description: 'Current visual NIM catalog model; server-account access must be verified before enablement.',
+    quotaAvailable: false,
+    recommended: false,
   },
-  'black-forest-labs/flux-1-schnell': {
-    id: 'black-forest-labs/flux-1-schnell',
+  'black-forest-labs/flux.1-schnell': {
+    id: 'black-forest-labs/flux.1-schnell',
     provider: 'nvidia',
     displayName: 'NVIDIA: FLUX.1 Schnell',
-    description: 'High-fidelity visual concepts, textures, and editorial real estate backdrops.',
-    quotaAvailable: true,
+    description: 'Current visual NIM catalog model; server-account access must be verified before enablement.',
+    quotaAvailable: false,
     recommended: false,
   },
-  'stabilityai/stable-diffusion-3-medium': {
-    id: 'stabilityai/stable-diffusion-3-medium',
-    provider: 'nvidia',
-    displayName: 'NVIDIA: SD 3 Medium',
-    description: 'Balanced visual concept generation with natural lighting aesthetics.',
-    quotaAvailable: true,
-    recommended: false,
-  },
-  'gemini-nano-banana': {
-    id: 'gemini-nano-banana',
+  'gemini-3.1-flash-image': {
+    id: 'gemini-3.1-flash-image',
     provider: 'gemini',
-    displayName: 'Google Gemini: Nano Banana (0 Free Quota)',
-    description: 'Currently shows 0 free daily quota in project dashboard. Available as optional/paid path.',
+    displayName: 'Google Gemini 3.1 Flash Image',
+    description: 'Current official native image model; server project access and pricing remain unverified.',
     quotaAvailable: false,
     recommended: false,
   },
@@ -153,7 +145,7 @@ export class ModelRegistry {
   public static readonly DEFAULT_TEXT_MODEL = 'gemini-3.5-flash-lite';
   public static readonly FALLBACK_TEXT_MODEL = 'gemini-3.1-flash-lite';
   public static readonly PREFERRED_PREMIUM_MODEL = 'gemini-3.7-flash';
-  public static readonly DEFAULT_NVIDIA_MODEL = 'stabilityai/sdxl-turbo';
+  public static readonly DEFAULT_NVIDIA_MODEL = 'stabilityai/stable-diffusion-3.5-large';
 
   public static getTextModel(id: string): AIModelDefinition {
     return GEMINI_TEXT_MODELS[id] || GEMINI_TEXT_MODELS[this.DEFAULT_TEXT_MODEL];
