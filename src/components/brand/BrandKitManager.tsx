@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { BrandKit, TypographyFamily } from '../../types/brandKit';
+import React, { useState, useEffect } from 'react';
+import { BrandKit, ColorPalette, TypographyFamily } from '../../types/brandKit';
 import { createNeutralBrandKit } from '../../services/storage/brandKitStore';
+import { BrandColorField } from './BrandColorField';
 import { 
   Palette, 
   Type, 
@@ -8,29 +9,49 @@ import {
   Building2, 
   Check, 
   RotateCcw, 
-  Eye,
-  Plus,
-  Trash2
+  Eye, 
+  Plus, 
+  Trash2 
 } from 'lucide-react';
 
 interface BrandKitManagerProps {
   brandKit: BrandKit;
+  runtimeMode?: 'demo' | 'live';
   onSaveBrandKit: (brandKit: BrandKit) => void;
 }
 
+const BRAND_COLOR_TOKENS: Array<{
+  key: keyof ColorPalette;
+  label: string;
+  description: string;
+}> = [
+  { key: 'primary', label: 'Primary', description: 'Main brand & headlines' },
+  { key: 'secondary', label: 'Secondary', description: 'Supporting accents & cards' },
+  { key: 'accent', label: 'Accent', description: 'Call-to-action & badges' },
+  { key: 'backgroundLight', label: 'Light Background', description: 'Editorial paper & surfaces' },
+  { key: 'backgroundDark', label: 'Dark Background', description: 'Navy hero & dark mode' },
+  { key: 'textPrimary', label: 'Primary Text', description: 'Body text & typography' },
+];
+
 export const BrandKitManager: React.FC<BrandKitManagerProps> = ({
   brandKit,
+  runtimeMode = 'live',
   onSaveBrandKit,
 }) => {
   const [formData, setFormData] = useState<BrandKit>(brandKit);
   const [newForbiddenWord, setNewForbiddenWord] = useState('');
   const [savedAlert, setSavedAlert] = useState(false);
 
+  // Synchronize form data when brandKit prop updates across runtimes or on reset
+  useEffect(() => {
+    setFormData(brandKit);
+  }, [brandKit]);
+
   const handleUpdate = (updates: Partial<BrandKit>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
   };
 
-  const handleColorUpdate = (key: keyof typeof formData.colors, val: string) => {
+  const handleColorUpdate = (key: keyof ColorPalette, val: string) => {
     setFormData((prev) => ({
       ...prev,
       colors: {
@@ -77,8 +98,13 @@ export const BrandKitManager: React.FC<BrandKitManagerProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-mono uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-bold">
-              GLOBAL BRAND SYSTEM
+              {runtimeMode === 'demo' ? 'DEMO BRAND SYSTEM · FICTIONAL IDENTITY' : 'GLOBAL BRAND SYSTEM'}
             </span>
+            {runtimeMode === 'demo' && (
+              <span className="text-[10px] text-amber-800 font-mono font-medium">
+                (Apex Capital Fixture)
+              </span>
+            )}
           </div>
           <h1 className="text-2xl font-serif font-bold text-slate-900 mt-1">Brand Kit & Identity</h1>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -90,7 +116,7 @@ export const BrandKitManager: React.FC<BrandKitManagerProps> = ({
           <button
             type="button"
             onClick={handleReset}
-            className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
+            className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Clear to Neutral</span>
@@ -98,7 +124,7 @@ export const BrandKitManager: React.FC<BrandKitManagerProps> = ({
 
           <button
             type="submit"
-            className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm flex items-center gap-2"
+            className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <Check className="w-4 h-4 text-amber-400" />
             <span>Save Brand Kit</span>
@@ -181,41 +207,25 @@ export const BrandKitManager: React.FC<BrandKitManagerProps> = ({
 
           {/* Color Palette */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-subtle space-y-4">
-            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-              <Palette className="w-4 h-4 text-slate-600" />
-              Brand Color Palette
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <Palette className="w-4 h-4 text-slate-600" />
+                Brand Color Palette
+              </h3>
+              <span className="text-[11px] text-slate-400 font-mono">6 Token Palette</span>
+            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {[
-                { key: 'primary', label: 'Primary Brand Color' },
-                { key: 'secondary', label: 'Secondary / Forest / Navy' },
-                { key: 'accent', label: 'Accent / Terracotta / Gold' },
-                { key: 'backgroundLight', label: 'Light Paper Background' },
-                { key: 'backgroundDark', label: 'Dark Navy Background' },
-                { key: 'textPrimary', label: 'Text Primary' },
-              ].map((c) => {
-                const colorKey = c.key as keyof typeof formData.colors;
-                return (
-                  <div key={c.key} className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-2">{c.label}</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={formData.colors[colorKey]}
-                        onChange={(e) => handleColorUpdate(colorKey, e.target.value)}
-                        className="w-8 h-8 rounded border border-slate-300 cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={formData.colors[colorKey]}
-                        onChange={(e) => handleColorUpdate(colorKey, e.target.value)}
-                        className="flex-1 text-xs p-1.5 border border-slate-300 rounded font-mono"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {BRAND_COLOR_TOKENS.map((token) => (
+                <BrandColorField
+                  key={token.key}
+                  colorKey={token.key}
+                  label={token.label}
+                  description={token.description}
+                  value={formData.colors[token.key]}
+                  onChange={(val) => handleColorUpdate(token.key, val)}
+                />
+              ))}
             </div>
           </div>
 

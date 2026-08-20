@@ -509,7 +509,13 @@ export function App() {
         />
       )}
 
-      {activeView === 'brand' && <BrandKitManager brandKit={brandKit} onSaveBrandKit={(kit) => void handleSaveBrandKit(kit)} />}
+      {activeView === 'brand' && (
+        <BrandKitManager
+          brandKit={brandKit}
+          runtimeMode={runtimeMode}
+          onSaveBrandKit={(kit) => void handleSaveBrandKit(kit)}
+        />
+      )}
       {activeView === 'leads' && <LeadFinder />}
       {activeView === 'settings' && <SettingsView organizationId={organization?.id} />}
 
