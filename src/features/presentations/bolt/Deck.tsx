@@ -11,6 +11,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { MotionConfig } from 'framer-motion';
 import { DeckCtx } from './DeckContext';
 import Annotator, { type Stroke } from './Annotator';
+import { PresentationViewport, CANONICAL_WIDTH, CANONICAL_HEIGHT } from './PresentationViewport';
 import {
   IconSidebar,
   IconGrid,
@@ -28,19 +29,14 @@ const fmt = (s: number) =>
 
 function Thumb({ children }: { children: ReactNode }) {
   const frameRef = useRef<HTMLDivElement>(null);
-  const [d, setD] = useState({ vw: 1280, vh: 720, scale: 0.15 });
+  const [scale, setScale] = useState(0.15);
 
   useLayoutEffect(() => {
     const el = frameRef.current;
     if (!el) return;
     const update = () => {
-      const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
-      const vh = typeof window !== 'undefined' ? window.innerHeight : 720;
-      setD({
-        vw,
-        vh,
-        scale: el.clientWidth / (vw || 1280),
-      });
+      const width = el.clientWidth || 240;
+      setScale(width / CANONICAL_WIDTH);
     };
     update();
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
@@ -56,12 +52,27 @@ function Thumb({ children }: { children: ReactNode }) {
     <div
       className="noir-thumb-frame"
       ref={frameRef}
-      style={{ aspectRatio: `${d.vw} / ${d.vh}` }}
+      style={{
+        aspectRatio: '16 / 9',
+        width: '100%',
+        position: 'relative',
+        overflow: 'hidden',
+        background: '#090e17',
+      }}
     >
       <DeckCtx.Provider value={{ clicks: 9999, isStatic: true }}>
         <div
           className="noir-thumb-scale"
-          style={{ width: d.vw, height: d.vh, transform: `scale(${d.scale})` }}
+          style={{
+            width: `${CANONICAL_WIDTH}px`,
+            height: `${CANONICAL_HEIGHT}px`,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            pointerEvents: 'none',
+          }}
         >
           {children}
         </div>
@@ -87,6 +98,7 @@ export default function Deck({
   onNotesChange,
   readOnly = false,
 }: DeckProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const slides = useMemo(
     () => Children.toArray(children) as ReactElement[],
     [children]
@@ -174,11 +186,15 @@ export default function Deck({
   }, [clicks, slide]);
 
   const toggleFs = useCallback(() => {
-    if (typeof document === 'undefined') return;
+    const el = containerRef.current;
+    if (!el || typeof document === 'undefined') return;
+
     if (document.fullscreenElement) {
-      document.exitFullscreen?.();
+      document.exitFullscreen?.().catch(() => {});
     } else {
-      document.documentElement.requestFullscreen?.();
+      el.requestFullscreen?.().catch(() => {
+        document.documentElement.requestFullscreen?.().catch(() => {});
+      });
     }
   }, []);
 
@@ -259,7 +275,7 @@ export default function Deck({
           toggleRail();
           break;
         case 'g':
-        case 'G':
+          case 'G':
           toggleGrid();
           break;
         case 'f':
@@ -288,7 +304,7 @@ export default function Deck({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [next, prev, go, total, toggleRail, toggleGrid, toggleFs, openPresenter]);
+  }, [next, prev, go, total, toggleRail, toggleGrid, toggleFs, openPresenter, readOnly]);
 
   // Touch Swipe Support
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -357,7 +373,14 @@ export default function Deck({
 
   // Fullscreen tracking & idle auto-hide
   useEffect(() => {
-    const h = () => setFs(Boolean(document.fullscreenElement));
+    const h = () => {
+      const isContainerFs = Boolean(
+        document.fullscreenElement &&
+        (document.fullscreenElement === containerRef.current ||
+          containerRef.current?.contains(document.fullscreenElement))
+      );
+      setFs(isContainerFs);
+    };
     document.addEventListener('fullscreenchange', h);
     return () => document.removeEventListener('fullscreenchange', h);
   }, []);
@@ -427,26 +450,37 @@ export default function Deck({
   return (
     <MotionConfig reducedMotion="user">
       <div
+        ref={containerRef}
         className={`zaw-deck${cursorHidden ? ' nocursor' : ''}${className ? ' ' + className : ''}`}
-        style={style}
+        style={{
+          width: '100%',
+          height: '100%',
+          position: 'relative',
+          overflow: 'hidden',
+          ...style,
+        }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        <DeckCtx.Provider value={liveCtx}>
-          <div className="slide-stage" key={slide}>
-            {slides[slide]}
-          </div>
-        </DeckCtx.Provider>
+        {/* Presentation Viewport with Canonical 1600x900 Scale & Letterboxing */}
+        <PresentationViewport>
+          <DeckCtx.Provider value={liveCtx}>
+            <div className="slide-stage" key={slide}>
+              {slides[slide]}
+            </div>
+          </DeckCtx.Provider>
 
-        {showAnnotator && (
-          <Annotator
-            key={slide}
-            slide={slide}
-            store={annStore.current}
-            active={drawing}
-          />
-        )}
+          {showAnnotator && (
+            <Annotator
+              key={slide}
+              slide={slide}
+              store={annStore.current}
+              active={drawing}
+            />
+          )}
+        </PresentationViewport>
 
+        {/* Thumbnail Sidebar */}
         <aside
           className={'noir-rail' + (railOpen ? ' open' : '')}
           aria-label="Slide thumbnail sidebar"
@@ -481,6 +515,7 @@ export default function Deck({
           </div>
         </aside>
 
+        {/* Slide Overview Grid */}
         {gridOpen && (
           <div className="noir-grid" role="dialog" aria-modal="true" aria-label="All slides overview">
             <div className="noir-grid-head">
@@ -513,6 +548,7 @@ export default function Deck({
           </div>
         )}
 
+        {/* Presenter Window */}
         {!readOnly && isPresenter && (
           <div className="noir-presenter" role="region" aria-label="Presenter control window">
             <div className="noir-presenter-row">
@@ -540,6 +576,7 @@ export default function Deck({
           </div>
         )}
 
+        {/* Dock Controls */}
         <nav
           className={'noir-dock' + (hideUI ? ' hidden' : '')}
           aria-label="Presentation toolbar"

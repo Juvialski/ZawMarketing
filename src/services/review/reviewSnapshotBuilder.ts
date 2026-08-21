@@ -13,7 +13,6 @@ import {
   SanitizedGraphicVariant, 
   SanitizedCopyChannel 
 } from '../../types/review';
-import { generateDeterministicPresentationDeck } from '../../features/presentations/services/demoDeckGenerator';
 
 export interface SnapshotBuildOptions {
   includedFormats?: OutputAspectRatio[];
@@ -35,11 +34,16 @@ export function buildReviewSnapshot(
   brandKit: BrandKit,
   options: SnapshotBuildOptions = {}
 ): ReviewSnapshot {
+  const isDemo =
+    Boolean(campaign.tags?.includes('Demo')) ||
+    Boolean(campaign.tags?.includes('Fictional')) ||
+    campaign.id.startsWith('demo-');
+
+  // Hero image: live campaigns must NEVER use fictional demo property exterior!
   const heroImage =
     campaign.sourceData.uploadedImages.find((img) => img.isHero) ||
-    campaign.sourceData.uploadedImages[0] || {
-      url: '/demo/fictional-property-exterior.png',
-    };
+    campaign.sourceData.uploadedImages[0] ||
+    (isDemo ? { url: '/demo/fictional-property-exterior.png' } : { url: '' });
 
   // 1. Build Graphic Materials with Multi-Variant Options
   const targetFormats: OutputAspectRatio[] = options.includedFormats || [
@@ -146,15 +150,11 @@ export function buildReviewSnapshot(
     }
   }
 
-  // 3. Presentation Deck
-  let presentation = options.includePresentation !== false ? campaign.presentation : undefined;
-  if (!presentation && options.includePresentation !== false) {
-    presentation = generateDeterministicPresentationDeck(campaign, brandKit);
-  }
+  // 3. Presentation Deck (DO NOT auto-generate unreviewed presentations during publish!)
+  const presentation = options.includePresentation !== false ? campaign.presentation : undefined;
 
-  // 4. Assemble Sanitized Snapshot (Free of internal AI models / debug data)
+  // 4. Assemble Sanitized Snapshot (Free of internal DB IDs / AI metadata / debug data)
   const snapshot: ReviewSnapshot = {
-    campaignId: campaign.id,
     campaignTitle: campaign.sourceData.title || campaign.name,
     campaignType: campaign.sourceData.campaignType,
     targetMarket: campaign.sourceData.targetMarket,

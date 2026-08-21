@@ -161,6 +161,11 @@ export function App() {
   };
 
   useEffect(() => {
+    // PUBLIC ROUTE ISOLATION: Do not bootstrap authenticated studio state when in public review mode
+    if (isReviewMode && reviewToken) {
+      return;
+    }
+
     void loadData();
 
     const { data: authListener } = AuthService.onAuthStateChange(() => {
@@ -170,7 +175,7 @@ export function App() {
     return () => {
       authListener?.subscription?.unsubscribe();
     };
-  }, []);
+  }, [isReviewMode, reviewToken]);
 
   const handleSelectCampaign = (campaign: Campaign) => {
     setSelectedCampaign(campaign);

@@ -34,4 +34,47 @@ describe('Review Cryptographic Engine', () => {
 
     expect(hashA).not.toBe(hashB);
   });
+
+  it('should fail closed if crypto.getRandomValues is unavailable', () => {
+    const originalCrypto = globalThis.crypto;
+    try {
+      // Temporarily remove getRandomValues
+      Object.defineProperty(globalThis, 'crypto', {
+        value: { getRandomValues: undefined },
+        configurable: true,
+        writable: true,
+      });
+
+      expect(() => generateSecureReviewToken()).toThrow(
+        /Cryptographically secure RNG \(crypto\.getRandomValues\) is required/
+      );
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', {
+        value: originalCrypto,
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
+
+  it('should fail closed if crypto is completely undefined', () => {
+    const originalCrypto = globalThis.crypto;
+    try {
+      Object.defineProperty(globalThis, 'crypto', {
+        value: undefined,
+        configurable: true,
+        writable: true,
+      });
+
+      expect(() => generateSecureReviewToken()).toThrow(
+        /Cryptographically secure RNG \(crypto\.getRandomValues\) is required/
+      );
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', {
+        value: originalCrypto,
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
 });

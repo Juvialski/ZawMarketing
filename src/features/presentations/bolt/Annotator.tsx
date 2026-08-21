@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { CANONICAL_WIDTH, CANONICAL_HEIGHT } from './PresentationViewport';
 
 type Tool =
   | 'pen'
@@ -9,17 +10,14 @@ type Tool =
   | 'ellipse'
   | 'eraser';
 
-type Pt = { x: number; y: number }; // relative to anchor box (0..1)
+export type Pt = { x: number; y: number }; // Canonical 1600x900 coordinates
 
 export type Stroke = {
   tool: Tool;
   color: string;
   size: number;
   points: Pt[];
-  anchor?: string;
 };
-
-type Box = { left: number; top: number; width: number; height: number };
 
 const TOOLS: { id: Tool; label: string; path: string }[] = [
   { id: 'pen', label: 'Pen', path: 'M4 20h4L18 10a2 2 0 0 0-3-3L5 17z' },
@@ -63,6 +61,7 @@ const IconUndo = () => (
     strokeLinecap="round"
     strokeLinejoin="round"
     aria-hidden="true"
+    style={{ width: 17, height: 17 }}
   >
     <path d="M9 8L5 12l4 4" />
     <path d="M5 12h9a4 4 0 1 1 0 8h-3" />
@@ -78,72 +77,11 @@ const IconTrash = () => (
     strokeLinecap="round"
     strokeLinejoin="round"
     aria-hidden="true"
+    style={{ width: 17, height: 17 }}
   >
     <path d="M5 7h14M10 7V5h4v2M6 7l1 13h10l1-13" />
   </svg>
 );
-
-const stage = () => document.querySelector('.slide-stage');
-const viewportBox = (): Box => ({
-  left: 0,
-  top: 0,
-  width: typeof window !== 'undefined' ? window.innerWidth : 1280,
-  height: typeof window !== 'undefined' ? window.innerHeight : 720,
-});
-
-function pathOf(el: Element): string {
-  const root = stage();
-  const parts: number[] = [];
-  let cur: Element | null = el;
-  while (cur && cur !== root) {
-    const parent: Element | null = cur.parentElement;
-    if (!parent) return '';
-    parts.unshift(Array.prototype.indexOf.call(parent.children, cur));
-    cur = parent;
-  }
-  return cur === root ? parts.join('.') : '';
-}
-
-function resolveAnchor(path?: string): Box | null {
-  if (path === undefined) return null;
-  const root = stage();
-  if (!root) return null;
-  let cur: Element = root;
-  if (path !== '') {
-    for (const i of path.split('.').map(Number)) {
-      const next = cur.children[i];
-      if (!next) return null;
-      cur = next;
-    }
-  }
-  const r = cur.getBoundingClientRect();
-  return r.width > 4 && r.height > 4 ? r : null;
-}
-
-function anchorAt(cx: number, cy: number): string {
-  if (typeof document === 'undefined' || !document.elementsFromPoint) return '';
-  for (const el of document.elementsFromPoint(cx, cy)) {
-    if (!el.closest('.slide-stage')) continue;
-    let block: Element | null = el;
-    while (
-      block &&
-      block !== stage() &&
-      getComputedStyle(block).display === 'inline'
-    ) {
-      block = block.parentElement;
-    }
-    return block ? pathOf(block) : '';
-  }
-  return '';
-}
-
-function clientPts(s: Stroke): Pt[] {
-  const r = resolveAnchor(s.anchor) ?? viewportBox();
-  return s.points.map((p) => ({
-    x: r.left + p.x * r.width,
-    y: r.top + p.y * r.height,
-  }));
-}
 
 function distToSeg(
   px: number,
@@ -180,7 +118,7 @@ function outline(tool: Tool, pts: Pt[]): Pt[] {
 }
 
 function hits(s: Stroke, x: number, y: number, r: number) {
-  const pts = outline(s.tool, clientPts(s));
+  const pts = outline(s.tool, s.points);
   if (pts.length === 1)
     return Math.hypot(pts[0].x - x, pts[0].y - y) < r + s.size;
   for (let i = 0; i < pts.length - 1; i++) {
@@ -194,15 +132,17 @@ function hits(s: Stroke, x: number, y: number, r: number) {
   return false;
 }
 
+export interface AnnotatorProps {
+  slide: number;
+  store: Record<number, Stroke[]>;
+  active: boolean;
+}
+
 export default function Annotator({
   slide,
   store,
   active,
-}: {
-  slide: number;
-  store: Record<number, Stroke[]>;
-  active: boolean;
-}) {
+}: AnnotatorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   if (!store[slide]) store[slide] = [];
   const strokes = useRef<Stroke[]>(store[slide]);
@@ -217,19 +157,19 @@ export default function Annotator({
   colorRef.current = color;
   sizeRef.current = size;
 
-  const resolve = (c: string) => {
+  const resolveColor = useCallback((c: string) => {
     if (typeof document === 'undefined') return '#c85a32';
     return c.startsWith('var(')
       ? getComputedStyle(document.documentElement)
           .getPropertyValue('--primary')
           .trim() || '#c85a32'
       : c;
-  };
+  }, []);
 
-  function paint(ctx: CanvasRenderingContext2D, s: Stroke, p: Pt[]) {
+  const paint = useCallback((ctx: CanvasRenderingContext2D, s: Stroke, p: Pt[]) => {
     if (!p.length) return;
     ctx.save();
-    ctx.strokeStyle = resolve(s.color);
+    ctx.strokeStyle = resolveColor(s.color);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.lineWidth = s.size;
@@ -284,97 +224,103 @@ export default function Annotator({
       ctx.stroke();
     }
     ctx.restore();
-  }
+  }, [resolveColor]);
 
-  function redraw() {
+  const redraw = useCallback(() => {
     const cv = canvasRef.current;
     if (!cv) return;
     const ctx = cv.getContext('2d');
     if (!ctx) return;
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cv.width / dpr, cv.height / dpr);
-    for (const s of strokes.current) paint(ctx, s, clientPts(s));
+    ctx.clearRect(0, 0, CANONICAL_WIDTH, CANONICAL_HEIGHT);
+    for (const s of strokes.current) paint(ctx, s, s.points);
     if (draft.current) paint(ctx, draft.current, draft.current.points);
-  }
+  }, [paint]);
 
-  function commit() {
+  const commit = useCallback(() => {
     store[slide] = strokes.current;
     redraw();
-  }
+  }, [slide, store, redraw]);
 
-  function erase(x: number, y: number) {
+  const erase = useCallback((x: number, y: number) => {
     const before = strokes.current.length;
-    strokes.current = strokes.current.filter((s) => !hits(s, x, y, 12));
+    strokes.current = strokes.current.filter((s) => !hits(s, x, y, 16));
     if (strokes.current.length !== before) commit();
-  }
+  }, [commit]);
+
+  // Translate client coordinates into canonical 1600x900 coordinate system
+  const getCanvasPt = useCallback((e: React.PointerEvent): Pt | null => {
+    const cv = canvasRef.current;
+    if (!cv) return null;
+    const rect = cv.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+
+    const scaleX = CANONICAL_WIDTH / rect.width;
+    const scaleY = CANONICAL_HEIGHT / rect.height;
+
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    return {
+      x: Math.max(0, Math.min(CANONICAL_WIDTH, x)),
+      y: Math.max(0, Math.min(CANONICAL_HEIGHT, y)),
+    };
+  }, []);
 
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
-    const fit = () => {
-      const dpr = window.devicePixelRatio || 1;
-      cv.width = window.innerWidth * dpr;
-      cv.height = window.innerHeight * dpr;
-      cv.style.width = window.innerWidth + 'px';
-      cv.style.height = window.innerHeight + 'px';
-      redraw();
-    };
-    fit();
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = CANONICAL_WIDTH * dpr;
+    cv.height = CANONICAL_HEIGHT * dpr;
+    redraw();
+
     const onUp = () => {
       const d = draft.current;
       if (!d) return;
       draft.current = null;
-      const xs = d.points.map((p) => p.x);
-      const ys = d.points.map((p) => p.y);
-      const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-      const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
-      d.anchor = anchorAt(cx, cy);
-      const r = resolveAnchor(d.anchor) ?? viewportBox();
-      d.points = d.points.map((p) => ({
-        x: (p.x - r.left) / r.width,
-        y: (p.y - r.top) / r.height,
-      }));
       strokes.current.push(d);
       commit();
     };
-    const t1 = window.setTimeout(redraw, 400);
-    const t2 = window.setTimeout(redraw, 1100);
-    window.addEventListener('resize', fit);
+
     window.addEventListener('pointerup', onUp);
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      window.removeEventListener('resize', fit);
       window.removeEventListener('pointerup', onUp);
     };
-  }, []);
+  }, [commit, redraw]);
 
   function down(e: React.PointerEvent) {
+    const pt = getCanvasPt(e);
+    if (!pt) return;
+
     if (toolRef.current === 'eraser') {
-      erase(e.clientX, e.clientY);
+      erase(pt.x, pt.y);
       return;
     }
     draft.current = {
       tool: toolRef.current,
       color: colorRef.current,
       size: sizeRef.current,
-      points: [{ x: e.clientX, y: e.clientY }],
+      points: [pt],
     };
     redraw();
   }
 
   function move(e: React.PointerEvent) {
+    const pt = getCanvasPt(e);
+    if (!pt) return;
+
     if (toolRef.current === 'eraser') {
-      if (e.buttons) erase(e.clientX, e.clientY);
+      if (e.buttons) erase(pt.x, pt.y);
       return;
     }
     const d = draft.current;
     if (!d) return;
     if (d.tool === 'pen' || d.tool === 'highlighter') {
-      d.points.push({ x: e.clientX, y: e.clientY });
+      d.points.push(pt);
     } else {
-      d.points = [d.points[0], { x: e.clientX, y: e.clientY }];
+      d.points = [d.points[0], pt];
     }
     redraw();
   }
@@ -387,6 +333,8 @@ export default function Annotator({
         style={{
           position: 'absolute',
           inset: 0,
+          width: `${CANONICAL_WIDTH}px`,
+          height: `${CANONICAL_HEIGHT}px`,
           zIndex: 45,
           pointerEvents: active ? 'auto' : 'none',
           cursor: tool === 'eraser' ? 'cell' : 'crosshair',

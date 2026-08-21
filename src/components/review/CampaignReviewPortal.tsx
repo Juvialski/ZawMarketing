@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ReviewSnapshot, 
   ReviewLinkPermissions, 
@@ -71,7 +71,7 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
   // Modals state
   const [inspectingMaterial, setInspectingMaterial] = useState<SanitizedGraphicMaterial | null>(null);
   const [comparingMaterial, setComparingMaterial] = useState<SanitizedGraphicMaterial | null>(null);
-  const [isFullscreenPresentation, setIsFullscreenPresentation] = useState(false);
+  const presentationContainerRef = useRef<HTMLDivElement>(null);
 
   // Overall Campaign Approval state
   const [isApprovingCampaign, setIsApprovingCampaign] = useState(false);
@@ -212,7 +212,7 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
     };
 
     const campaign: Campaign = {
-      id: snapshot.campaignId,
+      id: snapshot.campaignId || 'public-review-campaign',
       name: snapshot.campaignTitle,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -549,7 +549,15 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setIsFullscreenPresentation(true)}
+                  onClick={() => {
+                    if (presentationContainerRef.current) {
+                      if (document.fullscreenElement) {
+                        document.exitFullscreen?.();
+                      } else {
+                        presentationContainerRef.current.requestFullscreen?.();
+                      }
+                    }
+                  }}
                   className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer"
                 >
                   <Presentation className="w-4 h-4" />
@@ -559,7 +567,10 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
             </div>
 
             {/* Embedded 16:9 Container */}
-            <div className="w-full aspect-[16/9] max-h-[650px] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative">
+            <div
+              ref={presentationContainerRef}
+              className="w-full aspect-[16/9] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative flex items-center justify-center"
+            >
               <PresentationRenderer
                 deck={snapshot.presentation}
                 campaign={simulatedCampaign}
@@ -941,24 +952,6 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
           onMarkPreferred={handleMarkPreferred}
           onClose={() => setComparingMaterial(null)}
         />
-      )}
-
-      {/* Fullscreen Presentation Deck Overlay */}
-      {isFullscreenPresentation && snapshot.presentation && (
-        <div className="fixed inset-0 z-50 bg-slate-950 w-screen h-screen flex flex-col">
-          <PresentationRenderer
-            deck={snapshot.presentation}
-            campaign={simulatedCampaign}
-            brandKit={simulatedBrandKit}
-            readOnly={true}
-          />
-          <button
-            onClick={() => setIsFullscreenPresentation(false)}
-            className="absolute top-4 right-4 z-50 p-2.5 bg-slate-900/90 text-white hover:bg-red-900/60 rounded-xl border border-slate-700 text-xs font-mono font-bold shadow-2xl"
-          >
-            Exit Deck View (Esc)
-          </button>
-        </div>
       )}
     </div>
   );

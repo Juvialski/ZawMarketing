@@ -305,7 +305,7 @@ export const PresentationWorkspace: React.FC<PresentationWorkspaceProps> = ({
       {/* 3. Presentation Viewport Frame */}
       <div
         ref={containerRef}
-        className="w-full aspect-[16/9] min-h-[500px] max-h-[780px] bg-slate-950 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 relative"
+        className="w-full aspect-[16/9] bg-slate-950 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 relative flex items-center justify-center"
       >
         <PresentationRenderer
           deck={deck}

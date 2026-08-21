@@ -615,40 +615,61 @@ export interface Database {
       is_org_member: {
         Args: {
           org_id: string;
-          check_user_id: string;
+          check_user_id?: string;
         };
         Returns: boolean;
       };
       get_user_organization_ids: {
         Args: {
-          check_user_id: string;
+          check_user_id?: string;
         };
         Returns: string[];
       };
+      create_campaign_review_link_atomic: {
+        Args: {
+          p_organization_id: string;
+          p_campaign_id: string;
+          p_token_hash: string;
+          p_snapshot: Json;
+          p_permissions?: Json;
+          p_expires_at?: string | null;
+          p_user_id?: string | null;
+        };
+        Returns: Json;
+      };
+      publish_campaign_review_version_atomic: {
+        Args: {
+          p_organization_id: string;
+          p_review_link_id: string;
+          p_snapshot: Json;
+          p_title?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
       get_public_review_snapshot: {
         Args: {
-          p_token_hash: string;
-          p_passcode_hash?: string;
+          p_raw_token: string;
         };
         Returns: Json;
       };
       submit_public_review_feedback: {
         Args: {
-          p_token_hash: string;
+          p_raw_token: string;
           p_material_key: string;
-          p_variant_key?: string;
+          p_variant_key?: string | null;
           p_status?: string;
-          p_comment?: string;
-          p_reviewer_name?: string;
+          p_comment?: string | null;
+          p_reviewer_name?: string | null;
         };
         Returns: Json;
       };
       submit_public_campaign_approval: {
         Args: {
-          p_token_hash: string;
+          p_raw_token: string;
           p_status?: string;
-          p_notes?: string;
-          p_reviewer_name?: string;
+          p_notes?: string | null;
+          p_reviewer_name?: string | null;
         };
         Returns: Json;
       };

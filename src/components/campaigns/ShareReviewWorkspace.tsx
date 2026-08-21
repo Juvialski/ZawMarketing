@@ -24,7 +24,8 @@ import {
   Sparkles,
   Eye,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Sliders
 } from 'lucide-react';
 
 interface ShareReviewWorkspaceProps {
@@ -49,6 +50,18 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Material Selection Options for Published Snapshot
+  const [includedFormats, setIncludedFormats] = useState<OutputAspectRatio[]>([
+    'square',
+    'portrait',
+    'story',
+    'landscape',
+    'flyer_letter',
+  ]);
+  const [includePresentation, setIncludePresentation] = useState(true);
+  const [includeCopy, setIncludeCopy] = useState(true);
+  const [showMaterialOptions, setShowMaterialOptions] = useState(false);
 
   // Permission settings
   const [permissions, setPermissions] = useState<ReviewLinkPermissions>({
@@ -104,6 +117,12 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
     return now.toISOString();
   };
 
+  const getSnapshotBuildOptions = () => ({
+    includedFormats,
+    includePresentation,
+    includeCopy,
+  });
+
   // Create or Publish Link
   const handleCreateOrPublishLink = async () => {
     setActionLoading(true);
@@ -114,7 +133,9 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
         campaign,
         brandKit,
         permissions,
-        expiresAt
+        expiresAt,
+        undefined,
+        getSnapshotBuildOptions()
       );
 
       setActiveLink(result.link);
@@ -139,7 +160,9 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
         activeLink.id,
         campaign,
         brandKit,
-        `Review Package v${(activeLink.currentVersionNumber || 1) + 1}`
+        `Review Package v${(activeLink.currentVersionNumber || 1) + 1}`,
+        undefined,
+        getSnapshotBuildOptions()
       );
       setVersions((prev) => [newVersion, ...prev]);
       void loadReviewData();
@@ -161,7 +184,8 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
         organizationId,
         activeLink.id,
         campaign,
-        brandKit
+        brandKit,
+        getSnapshotBuildOptions()
       );
       setActiveLink(result.link);
       setRawToken(result.rawToken);
@@ -181,6 +205,7 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
     try {
       await CampaignReviewService.revokeReviewLink(organizationId, activeLink.id);
       setActiveLink((prev) => (prev ? { ...prev, isActive: false } : null));
+      setRawToken(null);
       void loadReviewData();
     } catch (e: any) {
       alert(`Failed to revoke link: ${e.message}`);
@@ -201,10 +226,10 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
     }
   };
 
-  // Build public link URL
+  // Build public link URL (ONLY when rawToken is available — never slice stored token hash!)
   const publicReviewUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
-    const tokenToUse = rawToken || (activeLink?.rawToken ?? activeLink?.tokenHash?.slice(0, 32));
+    const tokenToUse = rawToken || (activeLink?.rawToken ?? null);
     if (!tokenToUse) return '';
     return `${window.location.origin}/review/${tokenToUse}`;
   }, [rawToken, activeLink]);
@@ -216,10 +241,10 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // Build Final Approved Kit
+  // Build Final Approved Kit using owner final selections (incorporating reviewer preferred as suggestions)
   const handleBuildFinalApprovedKit = async () => {
     setIsPackagingFinalKit(true);
-    setPackageMessage('Assembling approved variants...');
+    setPackageMessage('Assembling final approved kit...');
     try {
       // Build campaign with preferred template family selections overridden
       const updatedDesignConfigs = { ...campaign.designConfigs };
@@ -253,6 +278,12 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
       setIsPackagingFinalKit(false);
       setPackageMessage('');
     }
+  };
+
+  const toggleFormat = (fmt: OutputAspectRatio) => {
+    setIncludedFormats((prev) =>
+      prev.includes(fmt) ? prev.filter((f) => f !== fmt) : [...prev, fmt]
+    );
   };
 
   // Calculate review metrics
@@ -292,6 +323,14 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
+          <button
+            onClick={() => setShowMaterialOptions((v) => !v)}
+            className="px-3.5 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-sm"
+          >
+            <Sliders className="w-4 h-4 text-slate-500" />
+            <span>Customize Shared Materials</span>
+          </button>
+
           {!activeLink || !activeLink.isActive ? (
             <button
               onClick={handleCreateOrPublishLink}
@@ -326,6 +365,66 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
         </div>
       </div>
 
+      {/* Material Selection Customization Panel */}
+      {showMaterialOptions && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-subtle space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-amber-600" />
+              <span>Select Materials to Include in Review Package</span>
+            </h3>
+            <span className="text-xs text-slate-500 font-mono">
+              Changes apply on next link creation or version publish
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includePresentation}
+                onChange={(e) => setIncludePresentation(e.target.checked)}
+                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span>16:9 Presentation Deck</span>
+            </label>
+
+            <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeCopy}
+                onChange={(e) => setIncludeCopy(e.target.checked)}
+                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span>Platform Copy & Scripts</span>
+            </label>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <div className="text-xs font-bold text-slate-700">Graphic Formats:</div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {[
+                { format: 'square' as const, label: 'Square (1:1)' },
+                { format: 'portrait' as const, label: 'Portrait (4:5)' },
+                { format: 'story' as const, label: 'Story/Reel (9:16)' },
+                { format: 'landscape' as const, label: 'Landscape (16:9)' },
+                { format: 'flyer_letter' as const, label: 'Print Flyer (Letter)' },
+              ].map(({ format, label }) => (
+                <label key={format} className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includedFormats.includes(format)}
+                    onChange={() => toggleFormat(format)}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2. Active Link Controls & URL Box */}
       {activeLink && activeLink.isActive && (
         <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-2xl shadow-elevated space-y-6">
@@ -346,28 +445,30 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
                   )}
                 </div>
                 <div className="text-xs text-slate-400 font-mono">
-                  Cryptographically secure token with SHA-256 hash boundary
+                  Cryptographically secure token with SHA-256 server-side verification
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <a
-                href={publicReviewUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              >
-                <Eye className="w-3.5 h-3.5 text-amber-400" />
-                <span>Preview Reviewer View</span>
-                <ExternalLink className="w-3 h-3 text-slate-400" />
-              </a>
+              {publicReviewUrl && (
+                <a
+                  href={publicReviewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Eye className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Preview Reviewer View</span>
+                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                </a>
+              )}
 
               <button
                 onClick={handleRotateLink}
                 disabled={actionLoading}
                 className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                title="Rotate token and invalidate old link"
+                title="Rotate token and generate new URL"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Rotate</span>
@@ -384,19 +485,42 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
             </div>
           </div>
 
-          {/* Share URL Bar */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <div data-testid="review-link-url" className="flex-1 font-mono text-xs text-slate-300 truncate w-full px-2">
-              {publicReviewUrl}
+          {/* Share URL Bar or Safe Recovery Prompt */}
+          {publicReviewUrl ? (
+            <div className="flex flex-col sm:flex-row items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div data-testid="review-link-url" className="flex-1 font-mono text-xs text-slate-300 truncate w-full px-2">
+                {publicReviewUrl}
+              </div>
+              <button
+                onClick={handleCopyLink}
+                className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                {copied ? <Check className="w-4 h-4 text-slate-950" /> : <Copy className="w-4 h-4 text-slate-950" />}
+                <span>{copied ? 'Copied URL!' : 'Copy Review Link'}</span>
+              </button>
             </div>
-            <button
-              onClick={handleCopyLink}
-              className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              {copied ? <Check className="w-4 h-4 text-slate-950" /> : <Copy className="w-4 h-4 text-slate-950" />}
-              <span>{copied ? 'Copied URL!' : 'Copy Review Link'}</span>
-            </button>
-          </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Review Link is Active</span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed max-w-xl">
+                  For security, the raw secret URL is only revealed when created or rotated. To obtain a fresh link URL to share with reviewers, click "Rotate & Get New URL".
+                </p>
+              </div>
+
+              <button
+                onClick={handleRotateLink}
+                disabled={actionLoading}
+                className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shrink-0 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Rotate & Get New URL</span>
+              </button>
+            </div>
+          )}
 
           {/* Review Permissions Toggles */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">

@@ -10,7 +10,7 @@ import {
 import { Campaign } from '../../types/campaign';
 import { BrandKit } from '../../types/brandKit';
 import { generateSecureReviewToken, hashReviewToken } from '../review/reviewCrypto';
-import { buildReviewSnapshot } from '../review/reviewSnapshotBuilder';
+import { buildReviewSnapshot, SnapshotBuildOptions } from '../review/reviewSnapshotBuilder';
 import { CampaignReviewStore } from '../storage/campaignReviewStore';
 import { ServiceError } from './serviceError';
 
@@ -68,89 +68,61 @@ export class CampaignReviewService {
     brandKit: BrandKit,
     permissions?: Partial<ReviewLinkPermissions>,
     expiresAt: string | null = null,
-    userId?: string
+    userId?: string,
+    snapshotOptions?: SnapshotBuildOptions
   ): Promise<{ link: ReviewLink; rawToken: string; version: ReviewVersion }> {
     if (isDemoContext(organizationId, campaign.id)) {
-      return CampaignReviewStore.createReviewLink(campaign, brandKit, permissions, expiresAt);
+      return CampaignReviewStore.createReviewLink(campaign, brandKit, permissions, expiresAt, snapshotOptions);
     }
 
     const rawToken = generateSecureReviewToken();
     const tokenHash = await hashReviewToken(rawToken);
+    const snapshot = buildReviewSnapshot(campaign, brandKit, snapshotOptions);
 
-    // 1. Deactivate old links for this campaign
-    await supabase
-      .from('campaign_review_links')
-      .update({ is_active: false })
-      .eq('organization_id', organizationId)
-      .eq('campaign_id', campaign.id);
+    const permissionsPayload: ReviewLinkPermissions = {
+      allowComments: permissions?.allowComments ?? true,
+      allowSelection: permissions?.allowSelection ?? true,
+      allowApproval: permissions?.allowApproval ?? true,
+      allowDownloads: permissions?.allowDownloads ?? false,
+    };
 
-    // 2. Insert new link
-    const { data: linkRow, error: linkError } = await supabase
-      .from('campaign_review_links')
-      .insert({
-        organization_id: organizationId,
-        campaign_id: campaign.id,
-        token_hash: tokenHash,
-        is_active: true,
-        expires_at: expiresAt,
-        allow_comments: permissions?.allowComments ?? true,
-        allow_selection: permissions?.allowSelection ?? true,
-        allow_approval: permissions?.allowApproval ?? true,
-        allow_downloads: permissions?.allowDownloads ?? false,
-        created_by: userId || null,
-        current_version_number: 1,
-      })
-      .select()
-      .single();
+    // Atomic transaction RPC
+    const { data, error } = await supabase.rpc('create_campaign_review_link_atomic', {
+      p_organization_id: organizationId,
+      p_campaign_id: campaign.id,
+      p_token_hash: tokenHash,
+      p_snapshot: snapshot as any,
+      p_permissions: permissionsPayload as any,
+      p_expires_at: expiresAt,
+      p_user_id: userId || (null as any),
+    });
 
-    if (linkError || !linkRow) {
-      throw new ServiceError('write_failed', `Failed to create review link: ${linkError?.message}`);
+    if (error || !data) {
+      throw new ServiceError('write_failed', `Failed to create review link: ${error?.message || 'Unknown error'}`);
     }
 
-    // 3. Build & insert version 1 snapshot
-    const snapshot = buildReviewSnapshot(campaign, brandKit);
-    const { data: versionRow, error: versionError } = await supabase
-      .from('campaign_review_versions')
-      .insert({
-        review_link_id: linkRow.id,
-        version_number: 1,
-        title: 'Review Package v1',
-        published_snapshot: snapshot as any,
-      })
-      .select()
-      .single();
-
-    if (versionError || !versionRow) {
-      throw new ServiceError('write_failed', `Failed to publish snapshot: ${versionError?.message}`);
-    }
-
+    const res = data as any;
     const link: ReviewLink = {
-      id: linkRow.id,
-      organizationId: linkRow.organization_id,
-      campaignId: linkRow.campaign_id,
-      tokenHash: linkRow.token_hash,
+      id: res.link_id,
+      organizationId,
+      campaignId: campaign.id,
+      tokenHash,
       rawToken,
-      isActive: linkRow.is_active,
-      expiresAt: linkRow.expires_at,
-      permissions: {
-        allowComments: linkRow.allow_comments,
-        allowSelection: linkRow.allow_selection,
-        allowApproval: linkRow.allow_approval,
-        allowDownloads: linkRow.allow_downloads,
-      },
-      currentVersionNumber: 1,
-      createdAt: linkRow.created_at,
-      updatedAt: linkRow.updated_at,
+      isActive: true,
+      expiresAt,
+      permissions: permissionsPayload,
+      currentVersionNumber: res.version_number || 1,
+      createdAt: res.created_at || new Date().toISOString(),
+      updatedAt: res.created_at || new Date().toISOString(),
     };
 
     const version: ReviewVersion = {
-      id: versionRow.id,
-      reviewLinkId: versionRow.review_link_id,
-      versionNumber: versionRow.version_number,
-      title: versionRow.title,
-      notes: versionRow.notes || undefined,
-      publishedAt: versionRow.published_at,
-      snapshot: versionRow.published_snapshot as any,
+      id: res.version_id,
+      reviewLinkId: res.link_id,
+      versionNumber: res.version_number || 1,
+      title: 'Review Package v1',
+      publishedAt: res.created_at || new Date().toISOString(),
+      snapshot,
     };
 
     return { link, rawToken, version };
@@ -162,63 +134,39 @@ export class CampaignReviewService {
     campaign: Campaign,
     brandKit: BrandKit,
     title?: string,
-    notes?: string
+    notes?: string,
+    snapshotOptions?: SnapshotBuildOptions
   ): Promise<ReviewVersion> {
     if (isDemoContext(organizationId, campaign.id)) {
-      const res = await CampaignReviewStore.publishNewVersion(reviewLinkId, campaign, brandKit, title, notes);
+      const res = await CampaignReviewStore.publishNewVersion(reviewLinkId, campaign, brandKit, title, notes, snapshotOptions);
       if (!res) throw new ServiceError('write_failed', 'Failed to publish new review version in store.');
       return res;
     }
 
-    // 1. Get current link
-    const { data: linkRow, error: linkErr } = await supabase
-      .from('campaign_review_links')
-      .select('*')
-      .eq('id', reviewLinkId)
-      .eq('organization_id', organizationId)
-      .single();
+    const snapshot = buildReviewSnapshot(campaign, brandKit, snapshotOptions);
 
-    if (linkErr || !linkRow) {
-      throw new ServiceError('write_failed', `Review link not found: ${linkErr?.message}`);
+    // Atomic version allocation & publication RPC
+    const { data, error } = await supabase.rpc('publish_campaign_review_version_atomic', {
+      p_organization_id: organizationId,
+      p_review_link_id: reviewLinkId,
+      p_snapshot: snapshot as any,
+      p_title: title || (null as any),
+      p_notes: notes || (null as any),
+    });
+
+    if (error || !data) {
+      throw new ServiceError('write_failed', `Failed to publish review version: ${error?.message || 'Unknown error'}`);
     }
 
-    const nextVersionNum = linkRow.current_version_number + 1;
-    const snapshot = buildReviewSnapshot(campaign, brandKit);
-
-    // 2. Insert new version
-    const { data: versionRow, error: verErr } = await supabase
-      .from('campaign_review_versions')
-      .insert({
-        review_link_id: reviewLinkId,
-        version_number: nextVersionNum,
-        title: title || `Review Package v${nextVersionNum}`,
-        notes: notes || null,
-        published_snapshot: snapshot as any,
-      })
-      .select()
-      .single();
-
-    if (verErr || !versionRow) {
-      throw new ServiceError('write_failed', `Failed to publish review version: ${verErr?.message}`);
-    }
-
-    // Update link version number
-    await supabase
-      .from('campaign_review_links')
-      .update({
-        current_version_number: nextVersionNum,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', reviewLinkId);
-
+    const res = data as any;
     return {
-      id: versionRow.id,
-      reviewLinkId: versionRow.review_link_id,
-      versionNumber: versionRow.version_number,
-      title: versionRow.title,
-      notes: versionRow.notes || undefined,
-      publishedAt: versionRow.published_at,
-      snapshot: versionRow.published_snapshot as any,
+      id: res.version_id,
+      reviewLinkId,
+      versionNumber: res.version_number,
+      title: res.title,
+      notes: notes || undefined,
+      publishedAt: res.published_at,
+      snapshot,
     };
   }
 
@@ -226,10 +174,11 @@ export class CampaignReviewService {
     organizationId: string,
     reviewLinkId: string,
     campaign: Campaign,
-    brandKit: BrandKit
+    brandKit: BrandKit,
+    snapshotOptions?: SnapshotBuildOptions
   ): Promise<{ link: ReviewLink; rawToken: string }> {
     if (isDemoContext(organizationId, campaign.id)) {
-      const res = await CampaignReviewStore.rotateReviewLink(reviewLinkId, campaign, brandKit);
+      const res = await CampaignReviewStore.rotateReviewLink(reviewLinkId, campaign, brandKit, snapshotOptions);
       if (!res) throw new ServiceError('write_failed', 'Failed to rotate review link in store.');
       return res;
     }
@@ -416,20 +365,23 @@ export class CampaignReviewService {
   public static async getPublicSnapshot(
     rawToken: string
   ): Promise<PublicReviewPortalResponse> {
-    const tokenHash = await hashReviewToken(rawToken);
-
-    // Check store first for demo/offline links
-    const storeLink = await CampaignReviewStore.getLinkByTokenHash(tokenHash);
-    if (storeLink || !isSupabaseConfigured()) {
-      return CampaignReviewStore.getPublicSnapshot(tokenHash);
+    if (!rawToken || !rawToken.trim()) {
+      return { status: 'not_found', error: 'Invalid review token.' };
     }
 
+    // Check store first for demo/offline links
+    const storeLink = await CampaignReviewStore.getLinkByRawTokenOrHash(rawToken);
+    if (storeLink || !isSupabaseConfigured()) {
+      return CampaignReviewStore.getPublicSnapshot(rawToken);
+    }
+
+    // Public RPC: sends raw token over HTTPS; RPC performs server-side SHA-256 digest lookup
     const { data, error } = await supabase.rpc('get_public_review_snapshot', {
-      p_token_hash: tokenHash,
+      p_raw_token: rawToken.trim(),
     });
 
     if (error || !data) {
-      return { status: 'not_found', error: 'Failed to connect to review service.' };
+      return { status: 'not_found', error: error?.message || 'Failed to connect to review service.' };
     }
 
     const res = data as any;
@@ -465,16 +417,18 @@ export class CampaignReviewService {
     comment?: string,
     reviewerName: string = 'Reviewer'
   ): Promise<{ success: boolean; feedback?: ReviewFeedback; error?: string }> {
-    const tokenHash = await hashReviewToken(rawToken);
+    if (!rawToken || !rawToken.trim()) {
+      return { success: false, error: 'Invalid review token.' };
+    }
 
     // Check store first for demo/offline links
-    const storeLink = await CampaignReviewStore.getLinkByTokenHash(tokenHash);
+    const storeLink = await CampaignReviewStore.getLinkByRawTokenOrHash(rawToken);
     if (storeLink || !isSupabaseConfigured()) {
-      return CampaignReviewStore.submitFeedback(tokenHash, materialKey, variantKey, status, comment, reviewerName);
+      return CampaignReviewStore.submitFeedback(rawToken, materialKey, variantKey, status, comment, reviewerName);
     }
 
     const { data, error } = await supabase.rpc('submit_public_review_feedback', {
-      p_token_hash: tokenHash,
+      p_raw_token: rawToken.trim(),
       p_material_key: materialKey,
       p_variant_key: variantKey || (null as any),
       p_status: status,
@@ -488,7 +442,7 @@ export class CampaignReviewService {
 
     const res = data as any;
     return {
-      success: res.success,
+      success: Boolean(res.success),
       error: res.error,
       feedback: res.feedback
         ? {
@@ -511,16 +465,18 @@ export class CampaignReviewService {
     notes?: string,
     reviewerName: string = 'Reviewer'
   ): Promise<{ success: boolean; status?: string; error?: string }> {
-    const tokenHash = await hashReviewToken(rawToken);
+    if (!rawToken || !rawToken.trim()) {
+      return { success: false, error: 'Invalid review token.' };
+    }
 
     // Check store first for demo/offline links
-    const storeLink = await CampaignReviewStore.getLinkByTokenHash(tokenHash);
+    const storeLink = await CampaignReviewStore.getLinkByRawTokenOrHash(rawToken);
     if (storeLink || !isSupabaseConfigured()) {
-      return CampaignReviewStore.submitCampaignApproval(tokenHash, status, notes, reviewerName);
+      return CampaignReviewStore.submitCampaignApproval(rawToken, status, notes, reviewerName);
     }
 
     const { data, error } = await supabase.rpc('submit_public_campaign_approval', {
-      p_token_hash: tokenHash,
+      p_raw_token: rawToken.trim(),
       p_status: status,
       p_notes: notes || (null as any),
       p_reviewer_name: reviewerName,
@@ -532,7 +488,7 @@ export class CampaignReviewService {
 
     const res = data as any;
     return {
-      success: res.success,
+      success: Boolean(res.success),
       status: res.status,
       error: res.error,
     };

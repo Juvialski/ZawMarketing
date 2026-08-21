@@ -78,7 +78,7 @@ export interface SanitizedCopyChannel {
 }
 
 export interface ReviewSnapshot {
-  campaignId: string;
+  campaignId?: string;
   campaignTitle: string;
   campaignType: CampaignType;
   targetMarket: string;

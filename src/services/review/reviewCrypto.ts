@@ -8,10 +8,8 @@
  */
 export function generateSecureReviewToken(): string {
   const cryptoObj = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined;
-  if (!cryptoObj || !cryptoObj.getRandomValues) {
-    const array = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) array[i] = Math.floor(Math.random() * 256);
-    return 'rev_' + Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
+  if (!cryptoObj || typeof cryptoObj.getRandomValues !== 'function') {
+    throw new Error('Cryptographically secure RNG (crypto.getRandomValues) is required to generate review tokens.');
   }
 
   const bytes = new Uint8Array(32);
@@ -22,7 +20,7 @@ export function generateSecureReviewToken(): string {
 
 /**
  * Computes the SHA-256 hash of a string, returned as a lowercase hex string.
- * Works in browser, Node, and test environments.
+ * Works in browser, Node, and test environments. Fails closed if SHA-256 is unavailable.
  */
 export async function hashReviewToken(token: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -34,17 +32,11 @@ export async function hashReviewToken(token: string): Promise<string> {
     return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
-  // Node.js fallback if subtle is absent
+  // Node.js support if subtle is absent
   try {
     const nodeCrypto = await import('crypto');
     return nodeCrypto.createHash('sha256').update(token).digest('hex');
   } catch {
-    // Pure fallback if neither subtle nor node:crypto is available
-    let hash = 0;
-    for (let i = 0; i < token.length; i++) {
-      hash = (hash << 5) - hash + token.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash).toString(16).padStart(64, '0');
+    throw new Error('Cryptographic SHA-256 digest capability is required to hash review tokens.');
   }
 }

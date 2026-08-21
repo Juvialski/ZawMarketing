@@ -6,7 +6,7 @@ import { ReviewLink, ReviewVersion, ReviewFeedback, ReviewLinkPermissions, Publi
 import { Campaign } from '../../types/campaign';
 import { BrandKit } from '../../types/brandKit';
 import { generateSecureReviewToken, hashReviewToken } from '../review/reviewCrypto';
-import { buildReviewSnapshot } from '../review/reviewSnapshotBuilder';
+import { buildReviewSnapshot, SnapshotBuildOptions } from '../review/reviewSnapshotBuilder';
 
 const LINKS_KEY = 'zaw_review_links_v1';
 const VERSIONS_KEY = 'zaw_review_versions_v1';
@@ -55,15 +55,25 @@ export class CampaignReviewStore {
     return this.getLinksByCampaign(campaignId).find((l) => l.isActive);
   }
 
-  public static async getLinkByTokenHash(tokenHash: string): Promise<ReviewLink | undefined> {
-    return this.getAllLinks().find((l) => l.tokenHash === tokenHash);
+  public static async getLinkByRawTokenOrHash(tokenOrHash: string): Promise<ReviewLink | undefined> {
+    const links = this.getAllLinks();
+    const directMatch = links.find((l) => l.rawToken === tokenOrHash || l.tokenHash === tokenOrHash);
+    if (directMatch) return directMatch;
+
+    try {
+      const computedHash = await hashReviewToken(tokenOrHash);
+      return links.find((l) => l.tokenHash === computedHash);
+    } catch {
+      return undefined;
+    }
   }
 
   public static async createReviewLink(
     campaign: Campaign,
     brandKit: BrandKit,
     permissions?: Partial<ReviewLinkPermissions>,
-    expiresAt: string | null = null
+    expiresAt: string | null = null,
+    snapshotOptions?: SnapshotBuildOptions
   ): Promise<{ link: ReviewLink; rawToken: string; version: ReviewVersion }> {
     const rawToken = generateSecureReviewToken();
     const tokenHash = await hashReviewToken(rawToken);
@@ -91,8 +101,8 @@ export class CampaignReviewStore {
       updatedAt: now,
     };
 
-    // Build initial snapshot version
-    const snapshot = buildReviewSnapshot(campaign, brandKit);
+    // Build initial snapshot version with selected materials
+    const snapshot = buildReviewSnapshot(campaign, brandKit, snapshotOptions);
     const version: ReviewVersion = {
       id: `ver-${linkId}-1`,
       reviewLinkId: linkId,
@@ -103,7 +113,7 @@ export class CampaignReviewStore {
     };
 
     const links = this.getAllLinks();
-    // Deactivate previous links for this campaign if any
+    // Deactivate previous links for this campaign atomically
     const updatedLinks = links.map((l) => (l.campaignId === campaign.id ? { ...l, isActive: false } : l));
     updatedLinks.unshift(link);
     this.saveLinks(updatedLinks);
@@ -118,7 +128,8 @@ export class CampaignReviewStore {
   public static async rotateReviewLink(
     linkId: string,
     campaign: Campaign,
-    brandKit: BrandKit
+    brandKit: BrandKit,
+    snapshotOptions?: SnapshotBuildOptions
   ): Promise<{ link: ReviewLink; rawToken: string }> {
     const rawToken = generateSecureReviewToken();
     const tokenHash = await hashReviewToken(rawToken);
@@ -127,7 +138,7 @@ export class CampaignReviewStore {
     const links = this.getAllLinks();
     const targetIndex = links.findIndex((l) => l.id === linkId);
     if (targetIndex < 0) {
-      return this.createReviewLink(campaign, brandKit);
+      return this.createReviewLink(campaign, brandKit, undefined, null, snapshotOptions);
     }
 
     const currentLink = links[targetIndex];
@@ -161,13 +172,20 @@ export class CampaignReviewStore {
     expiresAt?: string | null
   ): ReviewLink | null {
     const links = this.getAllLinks();
-    const target = links.find((l) => l.id === linkId);
-    if (!target) return null;
-    target.permissions = permissions;
-    if (expiresAt !== undefined) target.expiresAt = expiresAt;
-    target.updatedAt = new Date().toISOString();
+    const targetIndex = links.findIndex((l) => l.id === linkId);
+    if (targetIndex < 0) return null;
+
+    const currentLink = links[targetIndex];
+    const updatedLink: ReviewLink = {
+      ...currentLink,
+      permissions: { ...currentLink.permissions, ...permissions },
+      expiresAt: expiresAt !== undefined ? expiresAt : currentLink.expiresAt,
+      updatedAt: new Date().toISOString(),
+    };
+
+    links[targetIndex] = updatedLink;
     this.saveLinks(links);
-    return clone(target);
+    return clone(updatedLink);
   }
 
   // ---------------- Versions ----------------
@@ -207,34 +225,37 @@ export class CampaignReviewStore {
     campaign: Campaign,
     brandKit: BrandKit,
     title?: string,
-    notes?: string
+    notes?: string,
+    snapshotOptions?: SnapshotBuildOptions
   ): Promise<ReviewVersion | null> {
     const links = this.getAllLinks();
-    const link = links.find((l) => l.id === linkId);
-    if (!link) return null;
+    const linkIndex = links.findIndex((l) => l.id === linkId);
+    if (linkIndex < 0) return null;
 
-    const currentVersions = this.getVersionsByLinkId(linkId);
-    const nextVersionNum = (currentVersions[0]?.versionNumber || link.currentVersionNumber || 0) + 1;
+    const link = links[linkIndex];
+    const nextVersionNumber = (link.currentVersionNumber || 1) + 1;
     const now = new Date().toISOString();
 
-    const snapshot = buildReviewSnapshot(campaign, brandKit);
+    const snapshot = buildReviewSnapshot(campaign, brandKit, snapshotOptions);
     const newVersion: ReviewVersion = {
-      id: `ver-${linkId}-${nextVersionNum}`,
+      id: `ver-${linkId}-${nextVersionNumber}`,
       reviewLinkId: linkId,
-      versionNumber: nextVersionNum,
-      title: title || `Review Package v${nextVersionNum}`,
+      versionNumber: nextVersionNumber,
+      title: title || `Review Package v${nextVersionNumber}`,
       notes,
       publishedAt: now,
       snapshot,
     };
 
-    link.currentVersionNumber = nextVersionNum;
+    // Save version
+    const versions = this.getAllVersions();
+    versions.unshift(newVersion);
+    this.saveVersions(versions);
+
+    // Update link version number
+    link.currentVersionNumber = nextVersionNumber;
     link.updatedAt = now;
     this.saveLinks(links);
-
-    const allVersions = this.getAllVersions();
-    allVersions.unshift(newVersion);
-    this.saveVersions(allVersions);
 
     return clone(newVersion);
   }
@@ -266,8 +287,8 @@ export class CampaignReviewStore {
   }
 
   // ---------------- Public Access & RPC Simulation ----------------
-  public static async getPublicSnapshot(tokenHash: string): Promise<PublicReviewPortalResponse> {
-    const link = await this.getLinkByTokenHash(tokenHash);
+  public static async getPublicSnapshot(rawToken: string): Promise<PublicReviewPortalResponse> {
+    const link = await this.getLinkByRawTokenOrHash(rawToken);
     if (!link) {
       return { status: 'not_found', error: 'This review link does not exist or is invalid.' };
     }
@@ -285,7 +306,10 @@ export class CampaignReviewStore {
       return { status: 'no_version', error: 'No published review package is available.' };
     }
 
-    const feedback = this.getFeedbackByLinkId(link.id);
+    // Feedback is strictly version-bound
+    const feedback = this.getAllFeedback().filter(
+      (f) => f.reviewLinkId === link.id && (f.reviewVersionId === latestVersion.id || !f.reviewVersionId)
+    );
 
     return {
       status: 'active',
@@ -299,14 +323,14 @@ export class CampaignReviewStore {
   }
 
   public static async submitFeedback(
-    tokenHash: string,
+    rawToken: string,
     materialKey: string,
     variantKey?: string,
     status: ReviewStatus = 'preferred',
     comment?: string,
     reviewerName: string = 'Reviewer'
   ): Promise<{ success: boolean; feedback?: ReviewFeedback; error?: string }> {
-    const link = await this.getLinkByTokenHash(tokenHash);
+    const link = await this.getLinkByRawTokenOrHash(rawToken);
     if (!link || !link.isActive || (link.expiresAt && new Date(link.expiresAt) < new Date())) {
       return { success: false, error: 'This review link is not active or has expired.' };
     }
@@ -325,22 +349,12 @@ export class CampaignReviewStore {
     const now = new Date().toISOString();
     const allFeedback = this.getAllFeedback();
 
-    // If status is 'preferred', set existing preferred for same material/reviewer to not_reviewed
-    if (status === 'preferred') {
-      allFeedback.forEach((f) => {
-        if (f.reviewLinkId === link.id && f.materialKey === materialKey && f.reviewerName === reviewerName && f.status === 'preferred') {
-          f.status = 'not_reviewed';
-          f.updatedAt = now;
-        }
-      });
-    }
-
-    // Check if feedback item exists for this exact material & variant & reviewer
+    // Deterministic uniqueness per (reviewLinkId, reviewVersionId, materialKey, reviewerName)
     const existingIndex = allFeedback.findIndex(
       (f) =>
         f.reviewLinkId === link.id &&
+        f.reviewVersionId === latestVersion?.id &&
         f.materialKey === materialKey &&
-        (variantKey ? f.variantKey === variantKey : true) &&
         f.reviewerName === reviewerName
     );
 
@@ -348,7 +362,7 @@ export class CampaignReviewStore {
     if (existingIndex >= 0) {
       allFeedback[existingIndex] = {
         ...allFeedback[existingIndex],
-        variantKey: variantKey || allFeedback[existingIndex].variantKey,
+        variantKey: variantKey !== undefined ? variantKey : allFeedback[existingIndex].variantKey,
         status,
         comment: comment !== undefined ? comment : allFeedback[existingIndex].comment,
         updatedAt: now,
@@ -374,12 +388,12 @@ export class CampaignReviewStore {
   }
 
   public static async submitCampaignApproval(
-    tokenHash: string,
+    rawToken: string,
     status: 'approved' | 'needs_changes' = 'approved',
     notes?: string,
     reviewerName: string = 'Reviewer'
   ): Promise<{ success: boolean; status?: string; error?: string }> {
-    const link = await this.getLinkByTokenHash(tokenHash);
+    const link = await this.getLinkByRawTokenOrHash(rawToken);
     if (!link || !link.isActive || (link.expiresAt && new Date(link.expiresAt) < new Date())) {
       return { success: false, error: 'This review link is not active or has expired.' };
     }
@@ -392,20 +406,36 @@ export class CampaignReviewStore {
     const now = new Date().toISOString();
     const allFeedback = this.getAllFeedback();
 
-    const approvalItem: ReviewFeedback = {
-      id: `fb-campaign-${Date.now()}`,
-      reviewLinkId: link.id,
-      reviewVersionId: latestVersion?.id,
-      materialKey: 'campaign_overall',
-      reviewerName,
-      status,
-      comment: notes,
-      updatedAt: now,
-    };
+    const existingIndex = allFeedback.findIndex(
+      (f) =>
+        f.reviewLinkId === link.id &&
+        f.reviewVersionId === latestVersion?.id &&
+        f.materialKey === 'campaign_overall' &&
+        f.reviewerName === reviewerName
+    );
 
-    allFeedback.unshift(approvalItem);
+    if (existingIndex >= 0) {
+      allFeedback[existingIndex] = {
+        ...allFeedback[existingIndex],
+        status,
+        comment: notes !== undefined ? notes : allFeedback[existingIndex].comment,
+        updatedAt: now,
+      };
+    } else {
+      const approvalItem: ReviewFeedback = {
+        id: `fb-campaign-${Date.now()}`,
+        reviewLinkId: link.id,
+        reviewVersionId: latestVersion?.id,
+        materialKey: 'campaign_overall',
+        reviewerName,
+        status,
+        comment: notes,
+        updatedAt: now,
+      };
+      allFeedback.unshift(approvalItem);
+    }
+
     this.saveFeedback(allFeedback);
-
     return { success: true, status };
   }
 }
