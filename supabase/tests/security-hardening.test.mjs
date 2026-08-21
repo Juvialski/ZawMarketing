@@ -77,3 +77,26 @@ test('review feedback migration validates keys against published snapshot', asyn
   assert.match(sql, /Specified variant does not exist for this material/);
   assert.match(sql, /Material key does not exist in the published review package/);
 });
+
+test('forward migration 20260821130000 drops legacy review RPC overload and hardens feedback integrity', async () => {
+  const sql = await read('migrations/20260821130000_remove_legacy_review_rpc.sql');
+  // 1. Confirms legacy (TEXT, TEXT) overload is explicitly revoked and dropped
+  assert.match(sql, /REVOKE ALL ON FUNCTION public\.get_public_review_snapshot\(TEXT, TEXT\) FROM PUBLIC, anon, authenticated;/);
+  assert.match(sql, /DROP FUNCTION IF EXISTS public\.get_public_review_snapshot\(TEXT, TEXT\);/);
+
+  // 2. Confirms graphic preferred status requires valid variant key
+  assert.match(sql, /Preferred status for graphic materials requires a valid variant key/);
+
+  // 3. Confirms reviewer name normalization
+  assert.match(sql, /NULLIF\(TRIM\(p_reviewer_name\), ''\), 'Reviewer'/);
+
+  // 4. Confirms grants and role restrictions on single raw-token review snapshot RPC
+  assert.match(sql, /REVOKE ALL ON FUNCTION public\.get_public_review_snapshot\(TEXT\) FROM PUBLIC;/);
+  assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.get_public_review_snapshot\(TEXT\) TO anon, authenticated, service_role;/);
+
+  // 5. Confirms hardening migration 20260821110000 contains the current raw token sha256 server-side hash
+  const hardeningSql = await read('migrations/20260821110000_review_portal_hardening.sql');
+  assert.match(hardeningSql, /CREATE OR REPLACE FUNCTION public\.get_public_review_snapshot\(\s*p_raw_token TEXT\s*\)/);
+  assert.match(hardeningSql, /encode\(digest\(TRIM\(p_raw_token\), 'sha256'\), 'hex'\)/);
+});
+

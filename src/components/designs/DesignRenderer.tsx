@@ -73,9 +73,11 @@ export const DesignRenderer: React.FC<DesignRendererProps> = ({
     };
 
     updateScale();
-    const observer = new ResizeObserver(updateScale);
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(updateScale);
+      observer.observe(containerRef.current);
+      return () => observer.disconnect();
+    }
   }, [nativeWidth]);
 
   const renderTemplateContent = () => {

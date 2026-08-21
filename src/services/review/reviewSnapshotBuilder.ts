@@ -21,6 +21,56 @@ export interface SnapshotBuildOptions {
   includeCopy?: boolean;
 }
 
+export interface EffectiveReviewMaterials {
+  hasPresentation: boolean;
+  hasCopy: boolean;
+  graphicFormats: OutputAspectRatio[];
+  totalCount: number;
+}
+
+const DEFAULT_TARGET_FORMATS: OutputAspectRatio[] = [
+  'square',
+  'portrait',
+  'story',
+  'landscape',
+  'flyer_letter',
+];
+
+export function getEffectiveReviewMaterials(
+  campaign: Campaign,
+  options: SnapshotBuildOptions = {}
+): EffectiveReviewMaterials {
+  const includePresentation = options.includePresentation !== false;
+  const includeCopy = options.includeCopy !== false;
+  const graphicFormats =
+    options.includedFormats !== undefined
+      ? options.includedFormats
+      : DEFAULT_TARGET_FORMATS;
+
+  const hasPresentation = Boolean(includePresentation && campaign.presentation);
+  const hasCopy = Boolean(
+    includeCopy &&
+    campaign.copy &&
+    (campaign.copy.instagram ||
+     campaign.copy.linkedin ||
+     campaign.copy.facebook ||
+     campaign.copy.videoScript ||
+     campaign.copy.emailNewsletter)
+  );
+
+  const totalCount =
+    (hasPresentation ? 1 : 0) +
+    (hasCopy ? 1 : 0) +
+    graphicFormats.length;
+
+  return {
+    hasPresentation,
+    hasCopy,
+    graphicFormats,
+    totalCount,
+  };
+}
+
 const DEFAULT_FAMILIES: DesignTemplateFamily[] = [
   'editorial',
   'institutional',
@@ -46,13 +96,10 @@ export function buildReviewSnapshot(
     (isDemo ? { url: '/demo/fictional-property-exterior.png' } : { url: '' });
 
   // 1. Build Graphic Materials with Multi-Variant Options
-  const targetFormats: OutputAspectRatio[] = options.includedFormats || [
-    'square',
-    'portrait',
-    'story',
-    'landscape',
-    'flyer_letter',
-  ];
+  const targetFormats: OutputAspectRatio[] =
+    options.includedFormats !== undefined
+      ? options.includedFormats
+      : ['square', 'portrait', 'story', 'landscape', 'flyer_letter'];
 
   const graphicMaterials: SanitizedGraphicMaterial[] = targetFormats.map((format) => {
     const dim = FORMAT_DIMENSIONS[format];

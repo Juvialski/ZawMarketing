@@ -10,7 +10,7 @@ import {
 import { Campaign } from '../../types/campaign';
 import { BrandKit } from '../../types/brandKit';
 import { generateSecureReviewToken, hashReviewToken } from '../review/reviewCrypto';
-import { buildReviewSnapshot, SnapshotBuildOptions } from '../review/reviewSnapshotBuilder';
+import { buildReviewSnapshot, SnapshotBuildOptions, getEffectiveReviewMaterials } from '../review/reviewSnapshotBuilder';
 import { CampaignReviewStore } from '../storage/campaignReviewStore';
 import { ServiceError } from './serviceError';
 
@@ -71,6 +71,11 @@ export class CampaignReviewService {
     userId?: string,
     snapshotOptions?: SnapshotBuildOptions
   ): Promise<{ link: ReviewLink; rawToken: string; version: ReviewVersion }> {
+    const effective = getEffectiveReviewMaterials(campaign, snapshotOptions);
+    if (effective.totalCount === 0) {
+      throw new ServiceError('write_failed', 'Cannot create a review package with no effective materials. Ensure at least one graphic format, presentation deck, or copy item is available and selected.');
+    }
+
     if (isDemoContext(organizationId, campaign.id)) {
       return CampaignReviewStore.createReviewLink(campaign, brandKit, permissions, expiresAt, snapshotOptions);
     }
@@ -137,6 +142,11 @@ export class CampaignReviewService {
     notes?: string,
     snapshotOptions?: SnapshotBuildOptions
   ): Promise<ReviewVersion> {
+    const effective = getEffectiveReviewMaterials(campaign, snapshotOptions);
+    if (effective.totalCount === 0) {
+      throw new ServiceError('write_failed', 'Cannot publish a review version with no effective materials. Ensure at least one graphic format, presentation deck, or copy item is available and selected.');
+    }
+
     if (isDemoContext(organizationId, campaign.id)) {
       const res = await CampaignReviewStore.publishNewVersion(reviewLinkId, campaign, brandKit, title, notes, snapshotOptions);
       if (!res) throw new ServiceError('write_failed', 'Failed to publish new review version in store.');
@@ -331,17 +341,23 @@ export class CampaignReviewService {
 
   public static async getFeedback(
     organizationId: string,
-    reviewLinkId: string
+    reviewLinkId: string,
+    reviewVersionId?: string
   ): Promise<ReviewFeedback[]> {
     if (isDemoContext(organizationId)) {
-      return CampaignReviewStore.getFeedbackByLinkId(reviewLinkId);
+      return CampaignReviewStore.getFeedbackByLinkId(reviewLinkId, reviewVersionId);
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('campaign_review_feedback')
       .select('*')
-      .eq('review_link_id', reviewLinkId)
-      .order('updated_at', { ascending: false });
+      .eq('review_link_id', reviewLinkId);
+
+    if (reviewVersionId) {
+      query = query.eq('review_version_id', reviewVersionId);
+    }
+
+    const { data, error } = await query.order('updated_at', { ascending: false });
 
     if (error) {
       throw new ServiceError('write_failed', `Failed to load review feedback: ${error.message}`);
@@ -421,19 +437,30 @@ export class CampaignReviewService {
       return { success: false, error: 'Invalid review token.' };
     }
 
+    const sanitizedReviewerName = (reviewerName && reviewerName.trim()) ? reviewerName.trim().slice(0, 100) : 'Reviewer';
+    const sanitizedVariantKey = variantKey && variantKey.trim() ? variantKey.trim() : undefined;
+
+    // Graphic material integrity check: preferred status requires a valid non-empty variant key
+    const isGraphic = materialKey.startsWith('graphic_') || materialKey.includes('graphic');
+    if (isGraphic && status === 'preferred') {
+      if (!sanitizedVariantKey) {
+        return { success: false, error: 'Preferred status for graphic materials requires a valid variant key.' };
+      }
+    }
+
     // Check store first for demo/offline links
     const storeLink = await CampaignReviewStore.getLinkByRawTokenOrHash(rawToken);
     if (storeLink || !isSupabaseConfigured()) {
-      return CampaignReviewStore.submitFeedback(rawToken, materialKey, variantKey, status, comment, reviewerName);
+      return CampaignReviewStore.submitFeedback(rawToken, materialKey, sanitizedVariantKey, status, comment, sanitizedReviewerName);
     }
 
     const { data, error } = await supabase.rpc('submit_public_review_feedback', {
       p_raw_token: rawToken.trim(),
       p_material_key: materialKey,
-      p_variant_key: variantKey || (null as any),
+      p_variant_key: sanitizedVariantKey || (null as any),
       p_status: status,
       p_comment: comment || (null as any),
-      p_reviewer_name: reviewerName,
+      p_reviewer_name: sanitizedReviewerName,
     });
 
     if (error || !data) {
@@ -469,17 +496,19 @@ export class CampaignReviewService {
       return { success: false, error: 'Invalid review token.' };
     }
 
+    const sanitizedReviewerName = (reviewerName && reviewerName.trim()) ? reviewerName.trim().slice(0, 100) : 'Reviewer';
+
     // Check store first for demo/offline links
     const storeLink = await CampaignReviewStore.getLinkByRawTokenOrHash(rawToken);
     if (storeLink || !isSupabaseConfigured()) {
-      return CampaignReviewStore.submitCampaignApproval(rawToken, status, notes, reviewerName);
+      return CampaignReviewStore.submitCampaignApproval(rawToken, status, notes, sanitizedReviewerName);
     }
 
     const { data, error } = await supabase.rpc('submit_public_campaign_approval', {
       p_raw_token: rawToken.trim(),
       p_status: status,
       p_notes: notes || (null as any),
-      p_reviewer_name: reviewerName,
+      p_reviewer_name: sanitizedReviewerName,
     });
 
     if (error || !data) {

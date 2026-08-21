@@ -221,16 +221,18 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
         campaignType: snapshot.campaignType,
         title: snapshot.campaignTitle,
         targetMarket: snapshot.targetMarket,
-        uploadedImages: [
-          {
-            id: 'hero-1',
-            url: snapshot.heroImageUrl,
-            name: 'Hero Image',
-            source: 'sample',
-            aspectRatio: 1.5,
-            isHero: true,
-          },
-        ],
+        uploadedImages: snapshot.heroImageUrl && snapshot.heroImageUrl.trim() !== ''
+          ? [
+              {
+                id: 'hero-1',
+                url: snapshot.heroImageUrl,
+                name: 'Hero Image',
+                source: 'sample',
+                aspectRatio: 1.5,
+                isHero: true,
+              },
+            ]
+          : [],
         property: snapshot.property
           ? {
               address: snapshot.property.address,
@@ -438,17 +440,27 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
         {/* 2. Overview Section */}
         <section className="bg-slate-900/70 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Hero Image */}
-            <div className="lg:col-span-5 aspect-[4/3] rounded-2xl overflow-hidden shadow-xl border border-slate-800 bg-slate-950 relative group">
-              <img
-                src={snapshot.heroImageUrl}
-                alt={snapshot.campaignTitle}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur-sm border border-slate-800 px-3 py-1 rounded-lg text-[10px] font-mono text-slate-300">
-                Primary Asset Photography
+            {/* Hero Image or Branded Placeholder */}
+            {snapshot.heroImageUrl && snapshot.heroImageUrl.trim() !== '' ? (
+              <div className="lg:col-span-5 aspect-[4/3] rounded-2xl overflow-hidden shadow-xl border border-slate-800 bg-slate-950 relative group">
+                <img
+                  src={snapshot.heroImageUrl}
+                  alt={snapshot.campaignTitle}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur-sm border border-slate-800 px-3 py-1 rounded-lg text-[10px] font-mono text-slate-300">
+                  Primary Asset Photography
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="lg:col-span-5 aspect-[4/3] rounded-2xl border border-dashed border-slate-800 bg-slate-950/60 p-6 flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 mb-3">
+                  <MapPin className="w-6 h-6 text-slate-500" />
+                </div>
+                <div className="text-xs font-semibold text-slate-300">Property image not provided</div>
+                <div className="text-[10px] text-slate-500 mt-1 font-mono">Live campaign without primary photography</div>
+              </div>
+            )}
 
             {/* Investment Highlights */}
             <div className="lg:col-span-7 space-y-5">

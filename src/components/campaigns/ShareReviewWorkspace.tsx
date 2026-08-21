@@ -9,6 +9,7 @@ import {
 } from '../../types/review';
 import { CampaignReviewService } from '../../services/supabase/campaignReviewService';
 import { MarketingKitZipExporter } from '../../services/export/marketingKitZip';
+import { getEffectiveReviewMaterials } from '../../services/review/reviewSnapshotBuilder';
 import { 
   Share2, 
   Copy, 
@@ -46,6 +47,7 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
   const [activeLink, setActiveLink] = useState<ReviewLink | null>(null);
   const [rawToken, setRawToken] = useState<string | null>(null);
   const [versions, setVersions] = useState<ReviewVersion[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<ReviewFeedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -77,8 +79,20 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
   const [isPackagingFinalKit, setIsPackagingFinalKit] = useState(false);
   const [packageMessage, setPackageMessage] = useState('');
 
+  const getSnapshotBuildOptions = () => ({
+    includedFormats,
+    includePresentation,
+    includeCopy,
+  });
+
+  const effectiveMaterials = useMemo(() => {
+    return getEffectiveReviewMaterials(campaign, getSnapshotBuildOptions());
+  }, [campaign, includedFormats, includePresentation, includeCopy]);
+
+  const hasEffectiveMaterials = effectiveMaterials.totalCount > 0;
+
   // Load Review state
-  const loadReviewData = async () => {
+  const loadReviewData = async (targetVersionId?: string) => {
     setLoading(true);
     try {
       const linkList = await CampaignReviewService.getReviewLinks(organizationId, campaign.id);
@@ -87,14 +101,22 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
 
       if (active) {
         setPermissions(active.permissions);
-        const [vers, fbs] = await Promise.all([
-          CampaignReviewService.getVersions(organizationId, active.id),
-          CampaignReviewService.getFeedback(organizationId, active.id),
-        ]);
+        const vers = await CampaignReviewService.getVersions(organizationId, active.id);
         setVersions(vers);
+
+        const versionToLoad = targetVersionId
+          ? vers.find((v) => v.id === targetVersionId) || vers[0]
+          : (selectedVersionId ? vers.find((v) => v.id === selectedVersionId) : null) || vers[0];
+
+        setSelectedVersionId(versionToLoad?.id || null);
+
+        const fbs = versionToLoad
+          ? await CampaignReviewService.getFeedback(organizationId, active.id, versionToLoad.id)
+          : [];
         setFeedback(fbs);
       } else {
         setVersions([]);
+        setSelectedVersionId(null);
         setFeedback([]);
       }
     } catch (e) {
@@ -118,18 +140,10 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
     return now.toISOString();
   };
 
-  const getSnapshotBuildOptions = () => ({
-    includedFormats,
-    includePresentation,
-    includeCopy,
-  });
-
-  const hasSelectedMaterials = includedFormats.length > 0 || includePresentation || includeCopy;
-
   // Create or Publish Link
   const handleCreateOrPublishLink = async () => {
-    if (!hasSelectedMaterials) {
-      alert('Please select at least one material to include in the review package.');
+    if (!hasEffectiveMaterials) {
+      alert('Cannot create review package: no materials are available. Please ensure at least one graphic format, presentation deck, or copy item is available and selected.');
       return;
     }
     setActionLoading(true);
@@ -148,8 +162,9 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
       setActiveLink(result.link);
       setRawToken(result.rawToken);
       setVersions([result.version]);
+      setSelectedVersionId(result.version.id);
       setFeedback([]);
-      void loadReviewData();
+      void loadReviewData(result.version.id);
     } catch (e: any) {
       alert(`Failed to create review link: ${e.message}`);
     } finally {
@@ -160,8 +175,8 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
   // Publish New Version Snapshot
   const handlePublishNewVersion = async () => {
     if (!activeLink) return;
-    if (!hasSelectedMaterials) {
-      alert('Please select at least one material to include in the review package.');
+    if (!hasEffectiveMaterials) {
+      alert('Cannot publish review package: no materials are available. Please ensure at least one graphic format, presentation deck, or copy item is available and selected.');
       return;
     }
     setActionLoading(true);
@@ -176,7 +191,8 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
         getSnapshotBuildOptions()
       );
       setVersions((prev) => [newVersion, ...prev]);
-      void loadReviewData();
+      setSelectedVersionId(newVersion.id);
+      void loadReviewData(newVersion.id);
       alert(`Review Package v${newVersion.versionNumber} published! Public URL now reflects these latest changes.`);
     } catch (e: any) {
       alert(`Failed to publish version: ${e.message}`);
@@ -352,8 +368,8 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
           {!activeLink || !activeLink.isActive ? (
             <button
               onClick={handleCreateOrPublishLink}
-              disabled={actionLoading}
-              className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
+              disabled={actionLoading || !hasEffectiveMaterials}
+              className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Share2 className="w-4 h-4 text-amber-400" />
               <span>{actionLoading ? 'Creating Link...' : 'Create Secure Review Link'}</span>
@@ -362,8 +378,8 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
             <>
               <button
                 onClick={handlePublishNewVersion}
-                disabled={actionLoading}
-                className="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
+                disabled={actionLoading || !hasEffectiveMaterials}
+                className="px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Publish latest workspace edits to the review portal as a new version"
               >
                 <Sparkles className="w-4 h-4 text-amber-400" />
@@ -382,6 +398,19 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
           )}
         </div>
       </div>
+
+      {/* No Effective Materials Warning Banner */}
+      {!hasEffectiveMaterials && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 text-amber-900 text-xs">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+          <div>
+            <div className="font-bold">No Effective Materials Available</div>
+            <div className="text-amber-800 mt-0.5">
+              Cannot create or publish an empty review package. Ensure at least one graphic format is selected, or generate presentation/copy content before publishing.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Material Selection Customization Panel */}
       {showMaterialOptions && (
@@ -404,7 +433,7 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
                 onChange={(e) => setIncludePresentation(e.target.checked)}
                 className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
               />
-              <span>16:9 Presentation Deck</span>
+              <span>16:9 Presentation Deck {campaign.presentation ? '(Available)' : '(Not created yet)'}</span>
             </label>
 
             <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium cursor-pointer">
@@ -414,7 +443,7 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
                 onChange={(e) => setIncludeCopy(e.target.checked)}
                 className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
               />
-              <span>Platform Copy & Scripts</span>
+              <span>Platform Copy & Scripts {campaign.copy ? '(Available)' : '(Not created yet)'}</span>
             </label>
           </div>
 
@@ -586,7 +615,11 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
                 <Star className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-[10px] font-mono text-slate-500 uppercase">Preferred Selections</div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">
+                  {selectedVersionId && versions[0] && selectedVersionId !== versions[0].id
+                    ? `Preferred (${versions.find((v) => v.id === selectedVersionId)?.title || 'Version'})`
+                    : `Preferred (v${activeLink.currentVersionNumber || 1})`}
+                </div>
                 <div className="text-lg font-bold text-slate-900">{preferredFeedback.length} Variants</div>
               </div>
             </div>
@@ -596,7 +629,11 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-[10px] font-mono text-slate-500 uppercase">Approvals</div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">
+                  {selectedVersionId && versions[0] && selectedVersionId !== versions[0].id
+                    ? `Approvals (${versions.find((v) => v.id === selectedVersionId)?.title || 'Version'})`
+                    : `Approvals (v${activeLink.currentVersionNumber || 1})`}
+                </div>
                 <div className="text-lg font-bold text-slate-900">{approvalFeedback.length} Approved</div>
               </div>
             </div>
@@ -606,11 +643,33 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
                 <AlertCircle className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-[10px] font-mono text-slate-500 uppercase">Changes Requested</div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">
+                  {selectedVersionId && versions[0] && selectedVersionId !== versions[0].id
+                    ? `Changes Requested (${versions.find((v) => v.id === selectedVersionId)?.title || 'Version'})`
+                    : `Changes Requested (v${activeLink.currentVersionNumber || 1})`}
+                </div>
                 <div className="text-lg font-bold text-slate-900">{needsChangesFeedback.length} Items</div>
               </div>
             </div>
           </div>
+
+          {/* Historical Version Viewing Notice */}
+          {selectedVersionId && versions[0] && selectedVersionId !== versions[0].id && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between text-amber-900 text-xs">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  Viewing historical feedback for <strong>{versions.find((v) => v.id === selectedVersionId)?.title}</strong>. Selections and notes below reflect this version snapshot.
+                </span>
+              </div>
+              <button
+                onClick={() => void loadReviewData(versions[0].id)}
+                className="text-xs font-bold text-amber-900 underline hover:text-amber-700 font-mono shrink-0 cursor-pointer"
+              >
+                Switch to Current ({versions[0].title})
+              </button>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Left Column: Owner Final Design Selections & Reviewer Feedback */}
@@ -716,25 +775,61 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
 
               {/* Version History Card */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-subtle space-y-4">
-                <h3 className="text-base font-serif font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <Layers className="w-4 h-4 text-slate-700" />
-                  <span>Published Package Snapshots</span>
-                </h3>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h3 className="text-base font-serif font-bold text-slate-900 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-slate-700" />
+                    <span>Published Package Snapshots</span>
+                  </h3>
+                  <span className="text-xs font-mono text-slate-500">
+                    {versions.length} {versions.length === 1 ? 'Snapshot' : 'Snapshots'}
+                  </span>
+                </div>
 
                 <div className="space-y-2">
-                  {versions.map((ver) => (
-                    <div key={ver.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-bold text-slate-900">{ver.title}</span>
-                        <span className="ml-2 text-slate-500 font-mono text-[11px]">
-                          Published {new Date(ver.publishedAt).toLocaleDateString()} at {new Date(ver.publishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                  {versions.map((ver, idx) => {
+                    const isSelected = selectedVersionId === ver.id || (!selectedVersionId && idx === 0);
+                    const isLatest = idx === 0;
+
+                    return (
+                      <div
+                        key={ver.id}
+                        onClick={() => void loadReviewData(ver.id)}
+                        className={`p-3 rounded-xl border flex items-center justify-between text-xs cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-amber-50/80 border-amber-300 ring-1 ring-amber-300'
+                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900">{ver.title}</span>
+                            {isLatest && (
+                              <span className="text-[9px] font-mono uppercase bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                                Current Active
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-slate-500 font-mono text-[11px]">
+                            Published {new Date(ver.publishedAt).toLocaleDateString()} at {new Date(ver.publishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isSelected ? (
+                            <span className="text-[10px] font-mono bg-amber-200 text-amber-900 px-2 py-0.5 rounded font-bold">
+                              Viewing Feedback
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded">
+                              Click to view
+                            </span>
+                          )}
+                          <span className="text-[10px] font-mono bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">
+                            Immutable
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
-                        Immutable
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

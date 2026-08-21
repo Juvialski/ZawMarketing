@@ -6,7 +6,7 @@ import { ReviewLink, ReviewVersion, ReviewFeedback, ReviewLinkPermissions, Publi
 import { Campaign } from '../../types/campaign';
 import { BrandKit } from '../../types/brandKit';
 import { generateSecureReviewToken, hashReviewToken } from '../review/reviewCrypto';
-import { buildReviewSnapshot, SnapshotBuildOptions } from '../review/reviewSnapshotBuilder';
+import { buildReviewSnapshot, SnapshotBuildOptions, getEffectiveReviewMaterials } from '../review/reviewSnapshotBuilder';
 
 const LINKS_KEY = 'zaw_review_links_v1';
 const VERSIONS_KEY = 'zaw_review_versions_v1';
@@ -75,6 +75,11 @@ export class CampaignReviewStore {
     expiresAt: string | null = null,
     snapshotOptions?: SnapshotBuildOptions
   ): Promise<{ link: ReviewLink; rawToken: string; version: ReviewVersion }> {
+    const effective = getEffectiveReviewMaterials(campaign, snapshotOptions);
+    if (effective.totalCount === 0) {
+      throw new Error('Cannot create a review package with no effective materials. Ensure at least one graphic format, presentation deck, or copy item is available and selected.');
+    }
+
     const rawToken = generateSecureReviewToken();
     const tokenHash = await hashReviewToken(rawToken);
     const linkId = `link-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -228,6 +233,11 @@ export class CampaignReviewStore {
     notes?: string,
     snapshotOptions?: SnapshotBuildOptions
   ): Promise<ReviewVersion | null> {
+    const effective = getEffectiveReviewMaterials(campaign, snapshotOptions);
+    if (effective.totalCount === 0) {
+      throw new Error('Cannot publish a review version with no effective materials. Ensure at least one graphic format, presentation deck, or copy item is available and selected.');
+    }
+
     const links = this.getAllLinks();
     const linkIndex = links.findIndex((l) => l.id === linkId);
     if (linkIndex < 0) return null;
@@ -282,8 +292,12 @@ export class CampaignReviewStore {
     }
   }
 
-  public static getFeedbackByLinkId(linkId: string): ReviewFeedback[] {
-    return this.getAllFeedback().filter((f) => f.reviewLinkId === linkId);
+  public static getFeedbackByLinkId(linkId: string, reviewVersionId?: string): ReviewFeedback[] {
+    return this.getAllFeedback().filter((f) => {
+      if (f.reviewLinkId !== linkId) return false;
+      if (reviewVersionId) return f.reviewVersionId === reviewVersionId;
+      return true;
+    });
   }
 
   // ---------------- Public Access & RPC Simulation ----------------
@@ -393,10 +407,12 @@ export class CampaignReviewStore {
       }
     }
 
+    let isGraphic = false;
     if (!isValidMaterial && snapshot.graphicMaterials && Array.isArray(snapshot.graphicMaterials)) {
       const graphicMatch = snapshot.graphicMaterials.find((gm) => gm.id === materialKey);
       if (graphicMatch) {
         isValidMaterial = true;
+        isGraphic = true;
         if (variantKey && variantKey.trim()) {
           const variantMatch = graphicMatch.variants?.some((v) => v.id === variantKey.trim());
           if (!variantMatch) {
@@ -410,6 +426,13 @@ export class CampaignReviewStore {
       return { success: false, error: 'Material key does not exist in the published review package.' };
     }
 
+    // Graphic material integrity check: preferred status requires a valid non-empty variant key
+    if (isGraphic && status === 'preferred') {
+      if (!variantKey || !variantKey.trim()) {
+        return { success: false, error: 'Preferred status for graphic materials requires a valid variant key.' };
+      }
+    }
+
     // Validate permissions
     if (status === 'preferred' && !link.permissions.allowSelection) {
       return { success: false, error: 'Variant selection is disabled for this review link.' };
@@ -421,8 +444,9 @@ export class CampaignReviewStore {
       return { success: false, error: 'Comments are disabled for this review link.' };
     }
 
-    const sanitizedName = (reviewerName || 'Reviewer').trim().slice(0, 100);
+    const sanitizedName = (reviewerName && reviewerName.trim()) ? reviewerName.trim().slice(0, 100) : 'Reviewer';
     const sanitizedComment = (comment || '').trim().slice(0, 2000);
+    const sanitizedVariant = variantKey && variantKey.trim() ? variantKey.trim() : undefined;
     const now = new Date().toISOString();
     const allFeedback = this.getAllFeedback();
 
@@ -439,7 +463,7 @@ export class CampaignReviewStore {
     if (existingIndex >= 0) {
       allFeedback[existingIndex] = {
         ...allFeedback[existingIndex],
-        variantKey: variantKey !== undefined ? variantKey : allFeedback[existingIndex].variantKey,
+        variantKey: sanitizedVariant !== undefined ? sanitizedVariant : allFeedback[existingIndex].variantKey,
         status,
         comment: sanitizedComment ? sanitizedComment : undefined,
         updatedAt: now,
@@ -451,7 +475,7 @@ export class CampaignReviewStore {
         reviewLinkId: link.id,
         reviewVersionId: latestVersion.id,
         materialKey,
-        variantKey: variantKey || undefined,
+        variantKey: sanitizedVariant,
         reviewerName: sanitizedName,
         status,
         comment: sanitizedComment ? sanitizedComment : undefined,
@@ -482,13 +506,14 @@ export class CampaignReviewStore {
     const latestVersion = this.getLatestVersion(link.id);
     const now = new Date().toISOString();
     const allFeedback = this.getAllFeedback();
+    const sanitizedName = (reviewerName && reviewerName.trim()) ? reviewerName.trim().slice(0, 100) : 'Reviewer';
 
     const existingIndex = allFeedback.findIndex(
       (f) =>
         f.reviewLinkId === link.id &&
         f.reviewVersionId === latestVersion?.id &&
         f.materialKey === 'campaign_overall' &&
-        f.reviewerName === reviewerName
+        f.reviewerName === sanitizedName
     );
 
     if (existingIndex >= 0) {
@@ -504,7 +529,7 @@ export class CampaignReviewStore {
         reviewLinkId: link.id,
         reviewVersionId: latestVersion?.id,
         materialKey: 'campaign_overall',
-        reviewerName,
+        reviewerName: sanitizedName,
         status,
         comment: notes,
         updatedAt: now,
