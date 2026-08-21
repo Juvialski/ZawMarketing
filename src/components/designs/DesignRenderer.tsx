@@ -17,6 +17,8 @@ interface DesignRendererProps {
   className?: string;
   id?: string;
   showSafeZones?: boolean;
+  scale?: number;
+  previewMode?: 'auto' | 'controlled';
 }
 
 export const DesignRenderer: React.FC<DesignRendererProps> = ({
@@ -27,9 +29,13 @@ export const DesignRenderer: React.FC<DesignRendererProps> = ({
   className = '',
   id,
   showSafeZones = false,
+  scale: controlledScale,
+  previewMode = 'auto',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [internalScale, setInternalScale] = useState(1);
+  const isControlled = previewMode === 'controlled' || controlledScale !== undefined;
+  const effectiveScale = isControlled ? (controlledScale ?? 1) : internalScale;
 
   const baseConfig = campaign.designConfigs[aspectRatio] || {
     templateFamily: 'editorial',
@@ -62,12 +68,12 @@ export const DesignRenderer: React.FC<DesignRendererProps> = ({
   const nativeHeight = isLetter ? 1650 : isA4 ? 1754 : dimensions.height;
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (isControlled || !containerRef.current) return;
     const updateScale = () => {
       if (containerRef.current) {
         const clientWidth = containerRef.current.clientWidth;
         if (clientWidth > 0) {
-          setScale(clientWidth / nativeWidth);
+          setInternalScale(clientWidth / nativeWidth);
         }
       }
     };
@@ -78,7 +84,7 @@ export const DesignRenderer: React.FC<DesignRendererProps> = ({
       observer.observe(containerRef.current);
       return () => observer.disconnect();
     }
-  }, [nativeWidth]);
+  }, [isControlled, nativeWidth]);
 
   const renderTemplateContent = () => {
     if (aspectRatio === 'flyer_letter' || aspectRatio === 'flyer_a4') {
@@ -148,6 +154,8 @@ export const DesignRenderer: React.FC<DesignRendererProps> = ({
       className={`relative w-full overflow-hidden shadow-elevated bg-slate-900 rounded-lg ${className}`}
       style={{
         aspectRatio: `${nativeWidth} / ${nativeHeight}`,
+        width: isControlled ? `${Math.round(nativeWidth * effectiveScale)}px` : undefined,
+        height: isControlled ? `${Math.round(nativeHeight * effectiveScale)}px` : undefined,
       }}
     >
       <div
@@ -158,7 +166,7 @@ export const DesignRenderer: React.FC<DesignRendererProps> = ({
         style={{
           width: `${nativeWidth}px`,
           height: `${nativeHeight}px`,
-          transform: `scale(${scale})`,
+          transform: `scale(${effectiveScale})`,
           transformOrigin: 'top left',
         }}
         className="relative origin-top-left"

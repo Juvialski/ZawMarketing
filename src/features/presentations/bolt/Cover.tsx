@@ -24,7 +24,7 @@ export default function Cover({
           <div className="cover-scrim" aria-hidden="true" />
         </>
       )}
-      <div className="slide-container" style={{ maxWidth: 960 }}>
+      <div className="slide-container" style={{ maxWidth: 1280 }}>
         <Reveal>
           {kicker && (
             <div className="kicker" style={{ marginBottom: 8 }}>

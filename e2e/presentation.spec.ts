@@ -136,9 +136,19 @@ test('key presentation slides match visual baselines', async ({ page }) => {
     maxDiffPixelRatio: 0.15,
   });
 
-  // Slide 12: Next Steps
+  // Slide 11: Risk & Disclosures
   await page.keyboard.press('ArrowRight'); // Slide 10
   await page.keyboard.press('ArrowRight'); // Slide 11
+  await expect(page.getByText(/Legal & Underwriting Disclosures/i)).toBeVisible();
+  await expect(page.getByText(/Underwriting Assumptions & Risk Notice/i)).toBeVisible();
+  const disclosureCard = page.locator('.zaw-deck .slide-stage .mat');
+  await expect(disclosureCard).toBeVisible();
+  const cardBounds = await disclosureCard.boundingBox();
+  expect(cardBounds).toBeTruthy();
+  // Card should span widely on the 1600x900 canvas (scaled down to 1280x720)
+  expect(cardBounds!.width).toBeGreaterThan(900);
+
+  // Slide 12: Next Steps
   await page.keyboard.press('ArrowRight'); // Slide 12
   await expect(page.getByText(/Request Detailed Due Diligence Package/i)).toBeVisible();
   await expect(deck).toHaveScreenshot('presentation-phoenix-slide-12-next-steps.png', {

@@ -64,7 +64,50 @@ test('public client review portal loads standalone room with presentation, varia
   await modal.getByRole('button', { name: 'Close comparison view' }).click();
   await expect(modal).not.toBeVisible();
 
-  // 7. Submit Campaign Package Approval
+  // 7. Test Lightbox Modal with Instagram Portrait & Zoom / Fit controls
+  const inspectBtns = page.getByRole('button', { name: /Inspect/i });
+  if (await inspectBtns.count() > 0) {
+    await inspectBtns.first().click({ force: true });
+    const lightbox = page.getByRole('dialog', { name: /Lightbox View/i });
+    await expect(lightbox).toBeVisible();
+
+    // Verify default state is Fit mode
+    await expect(lightbox.getByRole('button', { name: 'Fit design to screen' })).toBeVisible();
+    await expect(lightbox.getByText(/Fit ·/i)).toBeVisible();
+
+    // Verify preview canvas box is completely within viewport bounds
+    const previewBox = lightbox.locator('.material-preview-canvas-box');
+    await expect(previewBox).toBeVisible();
+
+    const boxBounds = await previewBox.boundingBox();
+    const viewportBounds = await lightbox.locator('.material-preview-viewport').boundingBox();
+    expect(boxBounds).toBeTruthy();
+    expect(viewportBounds).toBeTruthy();
+    expect(boxBounds!.height).toBeLessThanOrEqual(viewportBounds!.height + 2);
+
+    // Test Zoom In
+    const zoomInBtn = lightbox.getByRole('button', { name: 'Zoom in' });
+    await zoomInBtn.click();
+    await expect(lightbox.getByText(/Fit ·/i)).not.toBeVisible(); // switched to custom zoom
+
+    // Test Fit Reset
+    const fitBtn = lightbox.getByRole('button', { name: 'Fit design to screen' });
+    await fitBtn.click();
+    await expect(lightbox.getByText(/Fit ·/i)).toBeVisible();
+
+    // Test Next Material navigation resets zoom to Fit
+    const nextBtn = lightbox.getByRole('button', { name: 'Next material' });
+    if (await nextBtn.isVisible()) {
+      await nextBtn.click();
+      await expect(lightbox.getByText(/Fit ·/i)).toBeVisible();
+    }
+
+    // Close lightbox
+    await lightbox.getByRole('button', { name: 'Close lightbox' }).click();
+    await expect(lightbox).not.toBeVisible();
+  }
+
+  // 8. Submit Campaign Package Approval
   const nameInput = page.getByPlaceholder('Your name (e.g. John)');
   await nameInput.fill('Sarah General Partner');
 
@@ -73,3 +116,4 @@ test('public client review portal loads standalone room with presentation, varia
 
   await expect(page.getByText('Review Successfully Submitted')).toBeVisible();
 });
+

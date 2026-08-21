@@ -35,16 +35,16 @@ export const CreativeShowcaseSlide: React.FC<CreativeShowcaseSlideProps> = ({
 
   return (
     <div className="slide center">
-      <div className="slide-container" style={{ maxWidth: 1160 }}>
+      <div className="slide-container" style={{ maxWidth: 1340 }}>
         <Reveal>
           {slide.kicker && (
-            <div className="kicker" style={{ marginBottom: 6, textAlign: 'center' }}>
+            <div className="kicker" style={{ marginBottom: 8, textAlign: 'center' }}>
               {slide.kicker}
             </div>
           )}
           <h2
             className="headline"
-            style={{ textAlign: 'center', marginInline: 'auto', marginBottom: 6, fontSize: 'clamp(22px, 3.2vw, 38px)' }}
+            style={{ textAlign: 'center', marginInline: 'auto', marginBottom: 8, fontSize: 38 }}
           >
             {slide.title}
           </h2>
@@ -53,9 +53,9 @@ export const CreativeShowcaseSlide: React.FC<CreativeShowcaseSlideProps> = ({
             style={{
               textAlign: 'center',
               marginInline: 'auto',
-              marginBottom: 'clamp(14px, 2vh, 22px)',
-              fontSize: 'clamp(13px, 1.2vw, 15px)',
-              maxWidth: 720,
+              marginBottom: 20,
+              fontSize: 17,
+              maxWidth: 860,
             }}
           >
             {slide.subtitle || 'Deterministic social graphics and flyers generated in tandem with this investment memorandum.'}

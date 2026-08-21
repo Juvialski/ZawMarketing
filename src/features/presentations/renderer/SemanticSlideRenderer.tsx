@@ -57,17 +57,17 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
           <Reveal>
             {slide.kicker && <div className="kicker" style={{ marginBottom: 10 }}>{slide.kicker}</div>}
             <h2 className="headline" style={{ marginInline: 'auto', marginBottom: 16 }}>{slide.title}</h2>
-            <p className="lead" style={{ marginInline: 'auto', marginBottom: 'clamp(20px, 3vh, 32px)' }}>
+            <p className="lead" style={{ marginInline: 'auto', marginBottom: 32 }}>
               {slide.summary}
             </p>
           </Reveal>
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: 14,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: 16,
               width: '100%',
-              maxWidth: 960,
+              maxWidth: 1340,
               marginInline: 'auto',
               textAlign: 'left',
             }}
@@ -77,15 +77,15 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
                 key={i}
                 className="mat"
                 style={{
-                  padding: '16px 20px',
+                  padding: '20px 24px',
                   borderRadius: 'var(--radius-sm)',
                   display: 'flex',
                   alignItems: 'flex-start',
-                  gap: 12,
+                  gap: 14,
                 }}
               >
-                <CheckCircle2 style={{ width: 18, height: 18, color: 'var(--primary)', flexShrink: 0, marginTop: 2 }} />
-                <span style={{ fontSize: 'clamp(13px, 1.3vw, 15px)', color: 'var(--fg)', lineHeight: 1.4 }}>
+                <CheckCircle2 style={{ width: 22, height: 22, color: 'var(--primary)', flexShrink: 0, marginTop: 2 }} />
+                <span style={{ fontSize: 16, color: 'var(--fg)', lineHeight: 1.45 }}>
                   {h}
                 </span>
               </div>
@@ -151,18 +151,18 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
         <Slide center nav={slide.navLabel || 'Investment Thesis'} notes={slide.speakerNotes}>
           <Reveal>
             {slide.kicker && <div className="kicker" style={{ marginBottom: 10 }}>{slide.kicker}</div>}
-            <h2 className="headline" style={{ marginInline: 'auto', marginBottom: 14 }}>{slide.title}</h2>
-            <p className="lead" style={{ marginInline: 'auto', marginBottom: 'clamp(24px, 3.5vh, 40px)' }}>
+            <h2 className="headline" style={{ marginInline: 'auto', marginBottom: 16 }}>{slide.title}</h2>
+            <p className="lead" style={{ marginInline: 'auto', marginBottom: 36 }}>
               {slide.thesis}
             </p>
           </Reveal>
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: 16,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 18,
               width: '100%',
-              maxWidth: 1000,
+              maxWidth: 1340,
               marginInline: 'auto',
             }}
           >
@@ -171,17 +171,17 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
                 key={i}
                 className="mat"
                 style={{
-                  padding: '20px 22px',
+                  padding: '24px 26px',
                   borderRadius: 'var(--radius)',
                   textAlign: 'left',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 8,
+                  gap: 10,
                 }}
               >
                 <div className="tick" />
-                <span className="kicker" style={{ fontSize: 11 }}>Pillar 0{i + 1}</span>
-                <p style={{ fontSize: 'clamp(13.5px, 1.4vw, 16px)', color: 'var(--fg)', lineHeight: 1.45 }}>
+                <span className="kicker" style={{ fontSize: 12 }}>Pillar 0{i + 1}</span>
+                <p style={{ fontSize: 16, color: 'var(--fg)', lineHeight: 1.5 }}>
                   {pillar}
                 </p>
               </div>
@@ -515,7 +515,7 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
             {slide.kicker && <div className="kicker" style={{ marginBottom: 10 }}>{slide.kicker}</div>}
             <h2 className="headline" style={{ marginInline: 'auto', marginBottom: 24 }}>{slide.title}</h2>
           </Reveal>
-          <div style={{ width: '100%', maxWidth: 880, marginInline: 'auto' }}>
+          <div style={{ width: '100%', maxWidth: 1280, marginInline: 'auto' }}>
             <Comparison
               cols={['Metric / Feature', slide.headers[0], slide.headers[1]]}
               rows={slide.rows.map((r) => ({ label: r.label, values: [r.current, r.projected] }))}
@@ -548,33 +548,34 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
       return (
         <Slide center nav={slide.navLabel || 'Disclosures'} notes={slide.speakerNotes}>
           <Reveal>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#f5b73a', marginBottom: 12 }}>
-              <ShieldAlert style={{ width: 24, height: 24 }} />
-              <span className="kicker" style={{ color: '#f5b73a', fontSize: 13 }}>Legal & Underwriting Disclosures</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: '#f5b73a', marginBottom: 14 }}>
+              <ShieldAlert style={{ width: 28, height: 28 }} />
+              <span className="kicker" style={{ color: '#f5b73a', fontSize: 14 }}>Legal & Underwriting Disclosures</span>
             </div>
-            <h2 className="headline" style={{ marginInline: 'auto', marginBottom: 20 }}>{slide.title}</h2>
+            <h2 className="headline" style={{ marginInline: 'auto', marginBottom: 24, fontSize: 38 }}>{slide.title}</h2>
           </Reveal>
 
           <div
             className="mat"
             style={{
-              padding: '24px 28px',
+              padding: '36px 42px',
               borderRadius: 'var(--radius)',
-              maxWidth: 880,
+              width: '100%',
+              maxWidth: 1340,
               marginInline: 'auto',
               textAlign: 'left',
-              background: 'rgba(245, 183, 58, 0.04)',
-              borderColor: 'rgba(245, 183, 58, 0.2)',
+              background: 'rgba(245, 183, 58, 0.05)',
+              borderColor: 'rgba(245, 183, 58, 0.25)',
             }}
           >
-            <p style={{ fontSize: 'clamp(13px, 1.3vw, 15px)', color: 'var(--fg-muted)', lineHeight: 1.6 }}>
+            <p style={{ fontSize: 17.5, color: 'var(--fg)', lineHeight: 1.65 }}>
               {slide.disclaimerText}
             </p>
 
             {slide.additionalCaveats && slide.additionalCaveats.length > 0 && (
-              <ul style={{ margin: '14px 0 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--fg-faint)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <ul style={{ margin: '18px 0 0 0', paddingLeft: 22, fontSize: 15, color: 'var(--fg-muted)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {slide.additionalCaveats.map((c, idx) => (
-                  <li key={idx}>{c}</li>
+                  <li key={idx} style={{ lineHeight: 1.5 }}>{c}</li>
                 ))}
               </ul>
             )}
@@ -589,7 +590,7 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
           <Reveal>
             {slide.kicker && <div className="kicker" style={{ marginBottom: 10 }}>{slide.kicker}</div>}
             <h1 className="display" style={{ marginInline: 'auto', marginBottom: 16 }}>{slide.title}</h1>
-            <p className="lead" style={{ marginInline: 'auto', marginBottom: 'clamp(24px, 4vh, 40px)' }}>
+            <p className="lead" style={{ marginInline: 'auto', marginBottom: 36 }}>
               {slide.ctaText}
             </p>
           </Reveal>
@@ -597,19 +598,20 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
           <div
             className="mat"
             style={{
-              padding: '24px 32px',
+              padding: '28px 44px',
               borderRadius: 'var(--radius)',
               display: 'inline-flex',
               flexDirection: 'column',
-              gap: 12,
+              gap: 14,
               textAlign: 'center',
+              minWidth: 600,
             }}
           >
-            <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--fg)' }}>
+            <div style={{ fontWeight: 700, fontSize: 22, color: 'var(--fg)' }}>
               {slide.contactInfo.company}
             </div>
             {slide.contactInfo.name && (
-              <div style={{ fontSize: 14, color: 'var(--fg-muted)' }}>
+              <div style={{ fontSize: 16, color: 'var(--fg-muted)' }}>
                 Presented by: {slide.contactInfo.name}
               </div>
             )}
@@ -620,33 +622,33 @@ export const SemanticSlideRenderer: React.FC<SemanticSlideRendererProps> = ({
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 18,
-                marginTop: 6,
-                fontSize: 13,
+                gap: 20,
+                marginTop: 8,
+                fontSize: 14,
                 color: 'var(--primary)',
                 fontFamily: 'var(--font-mono)',
               }}
             >
               {slide.contactInfo.email && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Mail style={{ width: 14, height: 14 }} /> {slide.contactInfo.email}
+                  <Mail style={{ width: 15, height: 15 }} /> {slide.contactInfo.email}
                 </span>
               )}
               {slide.contactInfo.phone && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Phone style={{ width: 14, height: 14 }} /> {slide.contactInfo.phone}
+                  <Phone style={{ width: 15, height: 15 }} /> {slide.contactInfo.phone}
                 </span>
               )}
               {slide.contactInfo.website && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Globe style={{ width: 14, height: 14 }} /> {slide.contactInfo.website}
+                  <Globe style={{ width: 15, height: 15 }} /> {slide.contactInfo.website}
                 </span>
               )}
             </div>
 
             {slide.contactInfo.licenseNumber && (
-              <div className="foot" style={{ marginTop: 6, opacity: 0.7 }}>
-                <Award style={{ width: 12, height: 12, display: 'inline', marginRight: 4 }} />
+              <div className="foot" style={{ marginTop: 8, opacity: 0.75 }}>
+                <Award style={{ width: 13, height: 13, display: 'inline', marginRight: 4 }} />
                 {slide.contactInfo.licenseNumber}
               </div>
             )}

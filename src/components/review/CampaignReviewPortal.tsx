@@ -954,6 +954,13 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
           allowSelection={permissions.allowSelection}
           onMarkPreferred={handleMarkPreferred}
           onClose={() => setComparingMaterial(null)}
+          onOpenLightbox={(m, vId) => {
+            if (vId) {
+              setActiveVariantMap((prev) => ({ ...prev, [m.id]: vId }));
+            }
+            setComparingMaterial(null);
+            setInspectingMaterial(m);
+          }}
         />
       )}
     </div>
