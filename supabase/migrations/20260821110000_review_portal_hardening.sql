@@ -303,6 +303,16 @@ $$;
 -- ------------------------------------------------------------------------------
 -- 5. PUBLIC RPC: GET REVIEW SNAPSHOT (SERVER-SIDE HASH LOOKUP)
 -- ------------------------------------------------------------------------------
+-- Drop legacy RPC signatures from 20260821100000 before recreating with new parameter names and hardened behavior:
+-- 1. Drop legacy (TEXT, TEXT) overload accepting token hash + passcode
+DROP FUNCTION IF EXISTS public.get_public_review_snapshot(TEXT, TEXT);
+
+-- 2. Drop legacy feedback RPC with parameter 'p_token_hash' to allow renaming to 'p_raw_token'
+DROP FUNCTION IF EXISTS public.submit_public_review_feedback(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT);
+
+-- 3. Drop legacy approval RPC with parameter 'p_token_hash' to allow renaming to 'p_raw_token'
+DROP FUNCTION IF EXISTS public.submit_public_campaign_approval(TEXT, TEXT, TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION public.get_public_review_snapshot(
   p_raw_token TEXT
 )

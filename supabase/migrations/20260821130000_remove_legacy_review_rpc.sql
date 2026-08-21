@@ -8,9 +8,8 @@
 BEGIN;
 
 -- ------------------------------------------------------------------------------
--- 1. DROP LEGACY (TEXT, TEXT) INSECURE OVERLOAD
+-- 1. DROP LEGACY (TEXT, TEXT) INSECURE OVERLOAD (IDEMPOTENT CLEANUP)
 -- ------------------------------------------------------------------------------
-REVOKE ALL ON FUNCTION public.get_public_review_snapshot(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 DROP FUNCTION IF EXISTS public.get_public_review_snapshot(TEXT, TEXT);
 
 -- ------------------------------------------------------------------------------
