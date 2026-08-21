@@ -23,6 +23,7 @@ export interface ReviewLink {
   isActive: boolean;
   expiresAt: string | null;
   permissions: ReviewLinkPermissions;
+  /** @deprecated Passcode protection is disabled; public links use secure URL tokens */
   passcodeHash?: string | null;
   currentVersionNumber: number;
   createdAt: string;
@@ -170,7 +171,7 @@ export interface ReviewVersion {
 }
 
 export interface PublicReviewPortalResponse {
-  status: 'active' | 'not_found' | 'revoked' | 'expired' | 'passcode_required' | 'no_version';
+  status: 'active' | 'not_found' | 'revoked' | 'expired' | 'no_version';
   error?: string;
   versionNumber?: number;
   versionTitle?: string;

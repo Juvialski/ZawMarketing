@@ -41,7 +41,7 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
   brandKit,
   organizationId = 'demo-org',
   runtimeMode: _runtimeMode,
-  onUpdateCampaign: _onUpdateCampaign,
+  onUpdateCampaign,
 }) => {
   const [activeLink, setActiveLink] = useState<ReviewLink | null>(null);
   const [rawToken, setRawToken] = useState<string | null>(null);
@@ -58,6 +58,7 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
     'story',
     'landscape',
     'flyer_letter',
+    'flyer_a4',
   ]);
   const [includePresentation, setIncludePresentation] = useState(true);
   const [includeCopy, setIncludeCopy] = useState(true);
@@ -123,8 +124,14 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
     includeCopy,
   });
 
+  const hasSelectedMaterials = includedFormats.length > 0 || includePresentation || includeCopy;
+
   // Create or Publish Link
   const handleCreateOrPublishLink = async () => {
+    if (!hasSelectedMaterials) {
+      alert('Please select at least one material to include in the review package.');
+      return;
+    }
     setActionLoading(true);
     try {
       const expiresAt = calculateExpiresAt(expirationOption);
@@ -153,6 +160,10 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
   // Publish New Version Snapshot
   const handlePublishNewVersion = async () => {
     if (!activeLink) return;
+    if (!hasSelectedMaterials) {
+      alert('Please select at least one material to include in the review package.');
+      return;
+    }
     setActionLoading(true);
     try {
       const newVersion = await CampaignReviewService.publishNewVersion(
@@ -226,6 +237,30 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
     }
   };
 
+  // Explicit Owner Final Selection action (Reviewer feedback is advisory; owner decides final)
+  const handleSetFinalDirection = (format: OutputAspectRatio, family: DesignTemplateFamily) => {
+    const currentConfig = campaign.designConfigs[format] || {
+      templateFamily: 'editorial' as DesignTemplateFamily,
+      aspectRatio: format,
+      headline: campaign.sourceData.title || campaign.name,
+      imageCropY: 50,
+      imageZoom: 1.0,
+      activeMetricIds: ['purchase', 'arv', 'spread'],
+      showDisclaimer: true,
+    };
+    const updatedCampaign: Campaign = {
+      ...campaign,
+      designConfigs: {
+        ...campaign.designConfigs,
+        [format]: {
+          ...currentConfig,
+          templateFamily: family,
+        },
+      },
+    };
+    onUpdateCampaign(updatedCampaign);
+  };
+
   // Build public link URL (ONLY when rawToken is available — never slice stored token hash!)
   const publicReviewUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -241,32 +276,15 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // Build Final Approved Kit using owner final selections (incorporating reviewer preferred as suggestions)
+  // Build Final Approved Kit strictly using owner final selections (campaign.designConfigs)
   const handleBuildFinalApprovedKit = async () => {
     setIsPackagingFinalKit(true);
-    setPackageMessage('Assembling final approved kit...');
+    setPackageMessage('Assembling final approved kit with owner-confirmed designs...');
     try {
-      // Build campaign with preferred template family selections overridden
-      const updatedDesignConfigs = { ...campaign.designConfigs };
-      feedback.forEach((f) => {
-        if (f.status === 'preferred' && f.variantKey && f.materialKey.startsWith('graphic_')) {
-          const format = f.materialKey.replace('graphic_', '') as OutputAspectRatio;
-          if (updatedDesignConfigs[format]) {
-            updatedDesignConfigs[format] = {
-              ...updatedDesignConfigs[format],
-              templateFamily: f.variantKey as DesignTemplateFamily,
-            };
-          }
-        }
-      });
-
-      const updatedCampaign: Campaign = {
-        ...campaign,
-        designConfigs: updatedDesignConfigs,
-      };
-
+      // Marketing kit is generated from campaign's confirmed design configs (owner final selections)
+      // Reviewer feedback is strictly advisory and does NOT automatically override owner selections
       await MarketingKitZipExporter.bundleAndDownloadKit(
-        updatedCampaign,
+        campaign,
         brandKit,
         (msg, pct) => {
           setPackageMessage(`${msg} (${pct}%)`);
@@ -402,13 +420,14 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
 
           <div className="space-y-2 pt-2">
             <div className="text-xs font-bold text-slate-700">Graphic Formats:</div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {[
                 { format: 'square' as const, label: 'Square (1:1)' },
                 { format: 'portrait' as const, label: 'Portrait (4:5)' },
                 { format: 'story' as const, label: 'Story/Reel (9:16)' },
                 { format: 'landscape' as const, label: 'Landscape (16:9)' },
                 { format: 'flyer_letter' as const, label: 'Print Flyer (Letter)' },
+                { format: 'flyer_a4' as const, label: 'Print Flyer (A4)' },
               ].map(({ format, label }) => (
                 <label key={format} className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs cursor-pointer">
                   <input
@@ -594,53 +613,105 @@ export const ShareReviewWorkspace: React.FC<ShareReviewWorkspaceProps> = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Column: Selections & Approvals Overview */}
+            {/* Left Column: Owner Final Design Selections & Reviewer Feedback */}
             <div className="lg:col-span-7 space-y-6">
+              {/* Owner Final Selection Card */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-subtle space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-base font-serif font-bold text-slate-900 flex items-center gap-2">
-                    <Star className="w-4 h-4 text-amber-500" />
-                    <span>Reviewer Preferred Selections</span>
-                  </h3>
-                  <span className="text-xs font-mono text-slate-500">
-                    {preferredFeedback.length} Variants Chosen
+                  <div>
+                    <h3 className="text-base font-serif font-bold text-slate-900 flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-amber-600" />
+                      <span>Owner Final Selected Designs</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      The final marketing kit exports these confirmed directions. Reviewer votes are advisory.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">
+                    Authoritative
                   </span>
                 </div>
 
-                {preferredFeedback.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic py-4">
-                    No variant preferences recorded yet. When the client selects "Mark as Preferred", their choices will automatically appear here.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {preferredFeedback.map((fb) => (
-                      <div key={fb.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 bg-amber-100 rounded-lg flex items-center justify-center text-amber-700 font-bold text-xs">
-                            ✓
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-slate-900">
-                              {fb.materialKey.replace('graphic_', '').replace('_', ' ').toUpperCase()}
-                            </div>
-                            <div className="text-[11px] text-amber-700 font-medium">
-                              Preferred Direction: <span className="font-bold">{fb.variantKey?.toUpperCase()}</span>
-                            </div>
+                <div className="space-y-4">
+                  {[
+                    { format: 'square' as const, label: 'Square (1:1)' },
+                    { format: 'portrait' as const, label: 'Portrait (4:5)' },
+                    { format: 'story' as const, label: 'Story/Reel (9:16)' },
+                    { format: 'landscape' as const, label: 'Landscape (16:9)' },
+                    { format: 'flyer_letter' as const, label: 'Print Flyer (Letter)' },
+                    { format: 'flyer_a4' as const, label: 'Print Flyer (A4)' },
+                  ].map(({ format, label }) => {
+                    const materialKey = `graphic_${format}`;
+                    const currentSelected = campaign.designConfigs[format]?.templateFamily || 'editorial';
+                    const formatFeedback = feedback.filter(
+                      (f) => f.materialKey === materialKey && f.status === 'preferred' && f.variantKey
+                    );
+
+                    return (
+                      <div key={format} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-900">{label}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-mono text-slate-500 uppercase">Current Final:</span>
+                            <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                              {currentSelected.replace(/_/g, ' ').toUpperCase()}
+                            </span>
                           </div>
                         </div>
 
-                        <div className="text-right">
-                          <div className="text-[10px] font-mono text-slate-500">
-                            {fb.reviewerName || 'Reviewer'}
+                        {/* Reviewer recommendations for this format */}
+                        {formatFeedback.length > 0 ? (
+                          <div className="space-y-1.5 pt-1 border-t border-slate-200/60">
+                            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+                              Reviewer Recommendations (Advisory):
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {formatFeedback.map((fb) => {
+                                const isCurrent = currentSelected === fb.variantKey;
+                                return (
+                                  <div
+                                    key={fb.id}
+                                    className={`p-2 rounded-lg border text-xs flex items-center justify-between gap-2 ${
+                                      isCurrent
+                                        ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                                        : 'bg-white border-slate-200 text-slate-800'
+                                    }`}
+                                  >
+                                    <div className="truncate">
+                                      <span className="font-bold">{fb.reviewerName || 'Reviewer'}: </span>
+                                      <span className="font-medium text-amber-800">
+                                        {fb.variantKey?.replace(/_/g, ' ').toUpperCase()}
+                                      </span>
+                                    </div>
+
+                                    {isCurrent ? (
+                                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded shrink-0">
+                                        Active Final
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() =>
+                                          handleSetFinalDirection(format, fb.variantKey as DesignTemplateFamily)
+                                        }
+                                        className="text-[10px] font-mono font-bold bg-slate-900 hover:bg-slate-800 text-white px-2 py-1 rounded transition-colors shrink-0 cursor-pointer"
+                                      >
+                                        Use as Final
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            {new Date(fb.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        ) : (
+                          <div className="text-[11px] text-slate-500 italic pt-0.5">
+                            No reviewer preferences submitted for this format yet.
                           </div>
-                        </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Version History Card */}

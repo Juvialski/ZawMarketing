@@ -14,7 +14,7 @@ import {
   GraphicDesignConfig 
 } from '../../types/campaign';
 import { BrandKit, TypographyFamily } from '../../types/brandKit';
-import { PresentationRenderer } from '../../features/presentations/renderer/PresentationRenderer';
+import { PresentationRenderer, PresentationRendererRef } from '../../features/presentations/renderer/PresentationRenderer';
 import { DesignRenderer } from '../designs/DesignRenderer';
 import { MaterialLightboxModal } from './MaterialLightboxModal';
 import { VariantComparisonModal } from './VariantComparisonModal';
@@ -41,7 +41,7 @@ interface CampaignReviewPortalProps {
 
 export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ token }) => {
   const [loading, setLoading] = useState(true);
-  const [accessStatus, setAccessStatus] = useState<'active' | 'not_found' | 'revoked' | 'expired' | 'passcode_required' | 'no_version'>('active');
+  const [accessStatus, setAccessStatus] = useState<'active' | 'not_found' | 'revoked' | 'expired' | 'no_version'>('active');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const [snapshot, setSnapshot] = useState<ReviewSnapshot | null>(null);
@@ -71,7 +71,7 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
   // Modals state
   const [inspectingMaterial, setInspectingMaterial] = useState<SanitizedGraphicMaterial | null>(null);
   const [comparingMaterial, setComparingMaterial] = useState<SanitizedGraphicMaterial | null>(null);
-  const presentationContainerRef = useRef<HTMLDivElement>(null);
+  const presentationRef = useRef<PresentationRendererRef>(null);
 
   // Overall Campaign Approval state
   const [isApprovingCampaign, setIsApprovingCampaign] = useState(false);
@@ -352,7 +352,6 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
       <ReviewAccessGate
         status={accessStatus === 'active' ? 'not_found' : accessStatus}
         errorMessage={errorMessage || undefined}
-        onSubmitPasscode={() => void loadReviewPortal()}
       />
     );
   }
@@ -550,13 +549,7 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    if (presentationContainerRef.current) {
-                      if (document.fullscreenElement) {
-                        document.exitFullscreen?.();
-                      } else {
-                        presentationContainerRef.current.requestFullscreen?.();
-                      }
-                    }
+                    presentationRef.current?.toggleFullscreen();
                   }}
                   className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer"
                 >
@@ -567,11 +560,9 @@ export const CampaignReviewPortal: React.FC<CampaignReviewPortalProps> = ({ toke
             </div>
 
             {/* Embedded 16:9 Container */}
-            <div
-              ref={presentationContainerRef}
-              className="w-full aspect-[16/9] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative flex items-center justify-center"
-            >
+            <div className="w-full aspect-[16/9] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative flex items-center justify-center">
               <PresentationRenderer
+                ref={presentationRef}
                 deck={snapshot.presentation}
                 campaign={simulatedCampaign}
                 brandKit={simulatedBrandKit}

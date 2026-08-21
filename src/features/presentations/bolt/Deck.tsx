@@ -1,7 +1,9 @@
 import React, {
   Children,
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -81,6 +83,14 @@ function Thumb({ children }: { children: ReactNode }) {
   );
 }
 
+export interface DeckRef {
+  toggleFullscreen: () => void;
+  requestFullscreen: () => Promise<void>;
+  exitFullscreen: () => Promise<void>;
+  isFullscreen: () => boolean;
+  getHostElement: () => HTMLDivElement | null;
+}
+
 export interface DeckProps {
   children: ReactNode;
   campaignId?: string;
@@ -90,14 +100,17 @@ export interface DeckProps {
   readOnly?: boolean;
 }
 
-export default function Deck({
-  children,
-  campaignId = 'default',
-  className = '',
-  style,
-  onNotesChange,
-  readOnly = false,
-}: DeckProps) {
+const Deck = forwardRef<DeckRef, DeckProps>(function Deck(
+  {
+    children,
+    campaignId = 'default',
+    className = '',
+    style,
+    onNotesChange,
+    readOnly = false,
+  },
+  ref
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const slides = useMemo(
     () => Children.toArray(children) as ReactElement[],
@@ -192,11 +205,34 @@ export default function Deck({
     if (document.fullscreenElement) {
       document.exitFullscreen?.().catch(() => {});
     } else {
-      el.requestFullscreen?.().catch(() => {
-        document.documentElement.requestFullscreen?.().catch(() => {});
-      });
+      el.requestFullscreen?.().catch(() => {});
     }
   }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      toggleFullscreen: toggleFs,
+      requestFullscreen: async () => {
+        if (containerRef.current && !document.fullscreenElement) {
+          await containerRef.current.requestFullscreen?.();
+        }
+      },
+      exitFullscreen: async () => {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen?.();
+        }
+      },
+      isFullscreen: () =>
+        Boolean(
+          document.fullscreenElement &&
+            (document.fullscreenElement === containerRef.current ||
+              containerRef.current?.contains(document.fullscreenElement))
+        ),
+      getHostElement: () => containerRef.current,
+    }),
+    [toggleFs]
+  );
 
   const toggleRail = useCallback(() => {
     setRailOpen((v) => !v);
@@ -638,4 +674,6 @@ export default function Deck({
       </div>
     </MotionConfig>
   );
-}
+});
+
+export default Deck;

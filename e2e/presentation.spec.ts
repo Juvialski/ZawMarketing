@@ -146,3 +146,48 @@ test('key presentation slides match visual baselines', async ({ page }) => {
     maxDiffPixelRatio: 0.15,
   });
 });
+
+test('workspace button and keyboard F use the exact same presentation host for fullscreen', async ({ page }) => {
+  await page.getByText(/Demo · Phoenix Value-Add/i).first().click();
+  await page.getByRole('button', { name: 'Investment Deck' }).click();
+
+  const deck = page.locator('.zaw-deck');
+  await expect(deck).toBeVisible();
+
+  // Track fullscreen requests
+  await page.evaluate(() => {
+    (window as any).__fsTargets = [];
+    Element.prototype.requestFullscreen = async function () {
+      (window as any).__fsTargets.push({
+        tagName: this.tagName,
+        className: this.className,
+        isZawDeck: this.classList.contains('zaw-deck'),
+      });
+    };
+  });
+
+  // 1. Trigger fullscreen via workspace button
+  await page.getByRole('button', { name: 'Present Fullscreen' }).click();
+
+  const targetFromButton = await page.evaluate(() => {
+    const targets = (window as any).__fsTargets;
+    return targets[targets.length - 1];
+  });
+
+  expect(targetFromButton).toBeDefined();
+  expect(targetFromButton.isZawDeck).toBe(true);
+
+  // 2. Trigger fullscreen via keyboard 'F'
+  await page.keyboard.press('f');
+
+  const targetFromKeyboard = await page.evaluate(() => {
+    const targets = (window as any).__fsTargets;
+    return targets[targets.length - 1];
+  });
+
+  expect(targetFromKeyboard).toBeDefined();
+  expect(targetFromKeyboard.isZawDeck).toBe(true);
+
+  // 3. Confirm both methods targeted the exact same host element class (.zaw-deck)
+  expect(targetFromButton.className).toBe(targetFromKeyboard.className);
+});

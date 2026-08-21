@@ -330,22 +330,99 @@ export class CampaignReviewStore {
     comment?: string,
     reviewerName: string = 'Reviewer'
   ): Promise<{ success: boolean; feedback?: ReviewFeedback; error?: string }> {
+    if (!rawToken || !rawToken.trim()) {
+      return { success: false, error: 'Invalid review token.' };
+    }
+
     const link = await this.getLinkByRawTokenOrHash(rawToken);
     if (!link || !link.isActive || (link.expiresAt && new Date(link.expiresAt) < new Date())) {
       return { success: false, error: 'This review link is not active or has expired.' };
     }
 
-    if (status === 'preferred' && !link.permissions.allowSelection) {
-      return { success: false, error: 'Variant selection is disabled for this link.' };
-    }
-    if ((status === 'approved' || status === 'needs_changes') && !link.permissions.allowApproval) {
-      return { success: false, error: 'Approvals are disabled for this link.' };
-    }
-    if (comment && !link.permissions.allowComments) {
-      return { success: false, error: 'Comments are disabled for this link.' };
+    const latestVersion = this.getLatestVersion(link.id);
+    if (!latestVersion || !latestVersion.snapshot) {
+      return { success: false, error: 'No active review version found.' };
     }
 
-    const latestVersion = this.getLatestVersion(link.id);
+    const snapshot = latestVersion.snapshot;
+
+    // Validate material key bounds & prohibit campaign_overall through item feedback
+    if (!materialKey || materialKey.length > 64 || !materialKey.trim()) {
+      return { success: false, error: 'Invalid or missing material key.' };
+    }
+
+    if (materialKey.trim().toLowerCase() === 'campaign_overall') {
+      return { success: false, error: 'Campaign overall approval must be submitted through the dedicated approval endpoint.' };
+    }
+
+    if (variantKey !== undefined && variantKey !== null && (variantKey.length > 64 || !variantKey.trim())) {
+      return { success: false, error: 'Invalid variant key.' };
+    }
+
+    // Inspect published snapshot for material existence
+    let isValidMaterial = false;
+
+    if (materialKey === 'presentation') {
+      if (snapshot.presentation) {
+        isValidMaterial = true;
+        if (variantKey && variantKey.trim()) {
+          return { success: false, error: 'Variants are not supported for presentation material.' };
+        }
+      }
+    } else if (materialKey === 'video_script' || materialKey === 'copy_video_script') {
+      if (snapshot.videoScript) {
+        isValidMaterial = true;
+        if (variantKey && variantKey.trim()) {
+          return { success: false, error: 'Variants are not supported for video script.' };
+        }
+      }
+    } else if (materialKey === 'email_newsletter' || materialKey === 'copy_email') {
+      if (snapshot.emailNewsletter) {
+        isValidMaterial = true;
+        if (variantKey && variantKey.trim()) {
+          return { success: false, error: 'Variants are not supported for email newsletter.' };
+        }
+      }
+    } else if (snapshot.copyChannels && Array.isArray(snapshot.copyChannels)) {
+      const copyMatch = snapshot.copyChannels.find((ch) => ch.id === materialKey);
+      if (copyMatch) {
+        isValidMaterial = true;
+        if (variantKey && variantKey.trim()) {
+          return { success: false, error: 'Variants are not supported for copy channels.' };
+        }
+      }
+    }
+
+    if (!isValidMaterial && snapshot.graphicMaterials && Array.isArray(snapshot.graphicMaterials)) {
+      const graphicMatch = snapshot.graphicMaterials.find((gm) => gm.id === materialKey);
+      if (graphicMatch) {
+        isValidMaterial = true;
+        if (variantKey && variantKey.trim()) {
+          const variantMatch = graphicMatch.variants?.some((v) => v.id === variantKey.trim());
+          if (!variantMatch) {
+            return { success: false, error: 'Specified variant does not exist for this material.' };
+          }
+        }
+      }
+    }
+
+    if (!isValidMaterial) {
+      return { success: false, error: 'Material key does not exist in the published review package.' };
+    }
+
+    // Validate permissions
+    if (status === 'preferred' && !link.permissions.allowSelection) {
+      return { success: false, error: 'Variant selection is disabled for this review link.' };
+    }
+    if ((status === 'approved' || status === 'needs_changes') && !link.permissions.allowApproval) {
+      return { success: false, error: 'Approvals are disabled for this review link.' };
+    }
+    if (comment && comment.trim() && !link.permissions.allowComments) {
+      return { success: false, error: 'Comments are disabled for this review link.' };
+    }
+
+    const sanitizedName = (reviewerName || 'Reviewer').trim().slice(0, 100);
+    const sanitizedComment = (comment || '').trim().slice(0, 2000);
     const now = new Date().toISOString();
     const allFeedback = this.getAllFeedback();
 
@@ -353,9 +430,9 @@ export class CampaignReviewStore {
     const existingIndex = allFeedback.findIndex(
       (f) =>
         f.reviewLinkId === link.id &&
-        f.reviewVersionId === latestVersion?.id &&
+        f.reviewVersionId === latestVersion.id &&
         f.materialKey === materialKey &&
-        f.reviewerName === reviewerName
+        f.reviewerName === sanitizedName
     );
 
     let feedbackItem: ReviewFeedback;
@@ -364,7 +441,7 @@ export class CampaignReviewStore {
         ...allFeedback[existingIndex],
         variantKey: variantKey !== undefined ? variantKey : allFeedback[existingIndex].variantKey,
         status,
-        comment: comment !== undefined ? comment : allFeedback[existingIndex].comment,
+        comment: sanitizedComment ? sanitizedComment : undefined,
         updatedAt: now,
       };
       feedbackItem = allFeedback[existingIndex];
@@ -372,12 +449,12 @@ export class CampaignReviewStore {
       feedbackItem = {
         id: `fb-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         reviewLinkId: link.id,
-        reviewVersionId: latestVersion?.id,
+        reviewVersionId: latestVersion.id,
         materialKey,
-        variantKey,
-        reviewerName,
+        variantKey: variantKey || undefined,
+        reviewerName: sanitizedName,
         status,
-        comment,
+        comment: sanitizedComment ? sanitizedComment : undefined,
         updatedAt: now,
       };
       allFeedback.unshift(feedbackItem);

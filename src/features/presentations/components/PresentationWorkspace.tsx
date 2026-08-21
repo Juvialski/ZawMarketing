@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Campaign } from '../../../types/campaign';
 import { BrandKit } from '../../../types/brandKit';
 import { PresentationDeck } from '../../../types/presentation';
-import { PresentationRenderer } from '../renderer/PresentationRenderer';
+import { PresentationRenderer, PresentationRendererRef } from '../renderer/PresentationRenderer';
 import { SlideEditorModal } from './SlideEditorModal';
 import { generateDeterministicPresentationDeck } from '../services/demoDeckGenerator';
 import { validatePresentationDeck } from '../utils/validatePresentationDeck';
@@ -51,7 +51,7 @@ export const PresentationWorkspace: React.FC<PresentationWorkspaceProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<string>('');
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const presentationRef = useRef<PresentationRendererRef>(null);
 
   const qaReport = deck ? validatePresentationDeck(deck, campaign) : null;
 
@@ -123,13 +123,7 @@ export const PresentationWorkspace: React.FC<PresentationWorkspaceProps> = ({
   };
 
   const handleFullscreen = () => {
-    if (containerRef.current) {
-      if (document.fullscreenElement) {
-        document.exitFullscreen?.();
-      } else {
-        containerRef.current.requestFullscreen?.();
-      }
-    }
+    presentationRef.current?.toggleFullscreen();
   };
 
   // Empty state when no presentation exists
@@ -303,11 +297,9 @@ export const PresentationWorkspace: React.FC<PresentationWorkspaceProps> = ({
       )}
 
       {/* 3. Presentation Viewport Frame */}
-      <div
-        ref={containerRef}
-        className="w-full aspect-[16/9] bg-slate-950 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 relative flex items-center justify-center"
-      >
+      <div className="w-full aspect-[16/9] bg-slate-950 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 relative flex items-center justify-center">
         <PresentationRenderer
+          ref={presentationRef}
           deck={deck}
           campaign={campaign}
           brandKit={brandKit}

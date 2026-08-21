@@ -93,6 +93,44 @@ describe('Presentation Viewport Canonical Scaler', () => {
     expect(offsetY).toBeGreaterThan(300);
   });
 
+  it('should calculate scale and letterbox for tablet landscape 1024x768 (4:3)', () => {
+    const hostWidth = 1024;
+    const hostHeight = 768;
+    const scale = calculatePresentationScale(hostWidth, hostHeight);
+
+    // bounded by width: 1024 / 1600 = 0.64
+    expect(scale).toBe(0.64);
+
+    const scaledWidth = CANONICAL_WIDTH * scale; // 1024
+    const scaledHeight = CANONICAL_HEIGHT * scale; // 576
+    const offsetX = (hostWidth - scaledWidth) / 2; // 0px
+    const offsetY = (hostHeight - scaledHeight) / 2; // (768 - 576) / 2 = 96px top/bottom letterbox
+
+    expect(scaledWidth).toBe(1024);
+    expect(scaledHeight).toBe(576);
+    expect(offsetX).toBe(0);
+    expect(offsetY).toBe(96);
+  });
+
+  it('should calculate scale and letterbox for modern iPad Air/Pro landscape 1180x820', () => {
+    const hostWidth = 1180;
+    const hostHeight = 820;
+    const scale = calculatePresentationScale(hostWidth, hostHeight);
+
+    // bounded by width: 1180 / 1600 = 0.7375
+    expect(scale).toBe(0.7375);
+
+    const scaledWidth = CANONICAL_WIDTH * scale; // 1180
+    const scaledHeight = CANONICAL_HEIGHT * scale; // 663.75
+    const offsetX = (hostWidth - scaledWidth) / 2; // 0px
+    const offsetY = (hostHeight - scaledHeight) / 2; // (820 - 663.75) / 2 = 78.125px
+
+    expect(scaledWidth).toBe(1180);
+    expect(scaledHeight).toBe(663.75);
+    expect(offsetX).toBe(0);
+    expect(offsetY).toBeCloseTo(78.125, 2);
+  });
+
   it('should handle zero or negative bounds safely', () => {
     expect(calculatePresentationScale(0, 0)).toBe(1);
     expect(calculatePresentationScale(-100, 500)).toBe(1);

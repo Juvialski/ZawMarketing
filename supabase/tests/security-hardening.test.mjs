@@ -65,3 +65,15 @@ test('Gemini request uses structured output and supported thinking levels', asyn
   assert.doesNotMatch(source, /temperature/);
   assert.doesNotMatch(source, /top_p|top_k/);
 });
+
+test('review feedback migration validates keys against published snapshot', async () => {
+  const sql = await read('migrations/20260821120000_feedback_snapshot_validation.sql');
+  assert.match(sql, /CREATE OR REPLACE FUNCTION public\.submit_public_review_feedback/);
+  assert.match(sql, /published_snapshot/);
+  assert.match(sql, /campaign_overall/);
+  assert.match(sql, /graphicMaterials/);
+  assert.match(sql, /copyChannels/);
+  assert.match(sql, /Variants are not supported for presentation material/);
+  assert.match(sql, /Specified variant does not exist for this material/);
+  assert.match(sql, /Material key does not exist in the published review package/);
+});
