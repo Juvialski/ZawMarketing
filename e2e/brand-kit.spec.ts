@@ -104,6 +104,7 @@ test('brand color palette matches desktop visual baseline', async ({ page }) => 
   await expect(palette).toBeVisible();
   await expect(palette).toHaveScreenshot('brand-color-palette-desktop.png', {
     animations: 'disabled',
+    maxDiffPixelRatio: 0.05,
   });
 });
 

@@ -77,25 +77,25 @@ ALTER TABLE public.campaign_review_feedback ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Org members can view review links"
   ON public.campaign_review_links FOR SELECT
   TO authenticated
-  USING (organization_id IN (SELECT public.get_user_organization_ids(auth.uid())));
+  USING (organization_id IN (SELECT public.get_user_organization_ids()));
 
 -- Organization members can create review links
 CREATE POLICY "Org members can create review links"
   ON public.campaign_review_links FOR INSERT
   TO authenticated
-  WITH CHECK (organization_id IN (SELECT public.get_user_organization_ids(auth.uid())));
+  WITH CHECK (organization_id IN (SELECT public.get_user_organization_ids()));
 
 -- Organization members can update review links
 CREATE POLICY "Org members can update review links"
   ON public.campaign_review_links FOR UPDATE
   TO authenticated
-  USING (organization_id IN (SELECT public.get_user_organization_ids(auth.uid())));
+  USING (organization_id IN (SELECT public.get_user_organization_ids()));
 
 -- Organization members can delete review links
 CREATE POLICY "Org members can delete review links"
   ON public.campaign_review_links FOR DELETE
   TO authenticated
-  USING (organization_id IN (SELECT public.get_user_organization_ids(auth.uid())));
+  USING (organization_id IN (SELECT public.get_user_organization_ids()));
 
 -- Organization members can view published review versions
 CREATE POLICY "Org members can view review versions"
@@ -104,7 +104,7 @@ CREATE POLICY "Org members can view review versions"
   USING (
     review_link_id IN (
       SELECT id FROM public.campaign_review_links
-      WHERE organization_id IN (SELECT public.get_user_organization_ids(auth.uid()))
+      WHERE organization_id IN (SELECT public.get_user_organization_ids())
     )
   );
 
@@ -115,7 +115,7 @@ CREATE POLICY "Org members can create review versions"
   WITH CHECK (
     review_link_id IN (
       SELECT id FROM public.campaign_review_links
-      WHERE organization_id IN (SELECT public.get_user_organization_ids(auth.uid()))
+      WHERE organization_id IN (SELECT public.get_user_organization_ids())
     )
   );
 
@@ -126,7 +126,7 @@ CREATE POLICY "Org members can view review feedback"
   USING (
     review_link_id IN (
       SELECT id FROM public.campaign_review_links
-      WHERE organization_id IN (SELECT public.get_user_organization_ids(auth.uid()))
+      WHERE organization_id IN (SELECT public.get_user_organization_ids())
     )
   );
 
